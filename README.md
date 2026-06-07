@@ -49,7 +49,7 @@ LULC_ANALYSIS_PLATFORM/
 ├── requirements.txt                  # Python Dependencies
 ├── .gitignore                        # Git Configuration
 └── README.md                         # Project Documentation
-
+````
 
 Note on Data Files: Due to GitHub's 100MB file size limit, the large .geojson spatial data files are not included in this repository. To run the backend locally, you will need to generate your own GeoJSON files using Landsat imagery and place them in the root directory with the exact names listed above.
 
