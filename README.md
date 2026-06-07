@@ -29,7 +29,7 @@ The system also features an interactive **Scenario Planning Game**, allowing use
 
 ## 🗂️ Project Structure
 
-
+``` text 
 LULC_ANALYSIS_PLATFORM/
 │
 ├── server.py                         # Main Flask API Backend (v4.0)
