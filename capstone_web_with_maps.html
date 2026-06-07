@@ -1,0 +1,1218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LULC Manouba — 1985–2025</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Outfit:wght@300;400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --ivory:      #FAF7F0;
+  --ivory-warm: #F3EEE3;
+  --ivory-deep: #EAE3D2;
+  --parchment:  #F0E8D5;
+  --olive:      #4A5E3A;
+  --olive-mid:  #6B7C58;
+  --olive-pale: #C8D5B4;
+  --olive-wash: #E8EFE0;
+  --urban:      #f31b1b;
+  --veg:        #104405;
+  --water:      #3F51B5;
+  --bare:       #ccb545;
+  --gain:       #2E7D52;
+  --loss:       #8B4049;
+  --stable:     #9C9080;
+  --bg:         var(--ivory);
+  --surface:    #FFFFFF;
+  --surface2:   var(--ivory-warm);
+  --border:     #DDD6C5;
+  --border2:    #C8BFA8;
+  --ink:        #2A2418;
+  --ink2:       #4A4235;
+  --ink3:       #8A7E6A;
+  --accent:     var(--olive);
+  --accent-lt:  var(--olive-wash);
+  --sh:         0 2px 16px rgba(40,30,10,.09),0 1px 3px rgba(40,30,10,.06);
+  --sh-lg:      0 8px 40px rgba(40,30,10,.12),0 2px 8px rgba(40,30,10,.07);
+  --sh-sm:      0 1px 4px rgba(40,30,10,.07),0 2px 12px rgba(40,30,10,.05);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;font-family:'Outfit',sans-serif;background:var(--ivory);color:var(--ink)}
+#app{display:flex;flex-direction:column;height:100vh}
+
+/* ══ HEADER ══ */
+header{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 1.75rem;height:60px;background:var(--surface);
+  border-bottom:1.5px solid var(--border);flex-shrink:0;
+  box-shadow:0 1px 6px rgba(40,30,10,.07);z-index:300;
+}
+.logo{display:flex;align-items:center;gap:11px}
+.logo-em{width:34px;height:34px;border-radius:8px;background:var(--olive);display:flex;align-items:center;justify-content:center;font-size:.95rem;color:#fff;box-shadow:0 2px 8px rgba(74,94,58,.35)}
+.logo-name{font-family:'Cormorant Garamond',serif;font-size:1.2rem;font-weight:700;color:var(--ink)}
+.logo-name span{color:var(--olive)}
+.logo-sub{font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--ink3);letter-spacing:2px;text-transform:uppercase;margin-top:1px}
+nav{display:flex;gap:3px}
+.nb{
+  display:flex;align-items:center;gap:5px;padding:6px 13px;border-radius:7px;
+  border:1.5px solid transparent;background:none;
+  font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:500;
+  color:var(--ink3);cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.nb:hover{background:var(--ivory-warm);color:var(--ink2);border-color:var(--border)}
+.nb.active{background:var(--olive-wash);border-color:var(--olive-pale);color:var(--olive);font-weight:600}
+
+/* ══ PAGES ══ */
+#pages{flex:1;overflow:hidden;position:relative}
+.page{
+  position:absolute;inset:0;overflow-y:auto;
+  opacity:0;pointer-events:none;transform:translateY(12px);
+  transition:opacity .24s ease,transform .24s ease;
+  padding:1.75rem 2.25rem 3rem;
+}
+.page.active{opacity:1;pointer-events:all;transform:none}
+.page::-webkit-scrollbar{width:5px}
+.page::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ══ PAGE HEADER ══ */
+.pgh{margin-bottom:1.5rem;padding-bottom:1.1rem;border-bottom:1.5px solid var(--border)}
+.pgh-label{font-family:'JetBrains Mono',monospace;font-size:.63rem;letter-spacing:2.5px;text-transform:uppercase;color:var(--olive-mid);margin-bottom:.35rem}
+.pgh-title{font-family:'Cormorant Garamond',serif;font-size:clamp(1.8rem,3vw,2.6rem);font-weight:700;line-height:1.05;color:var(--ink)}
+.pgh-title em{color:var(--olive);font-style:italic}
+.pgh-desc{font-size:.82rem;color:var(--ink3);margin-top:.4rem;font-weight:300;line-height:1.6;max-width:780px}
+
+/* ══ HOME ══ */
+#pg-home{padding:0}
+.home-wrap{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;position:relative;overflow:hidden;background:var(--ivory)}
+.home-deco{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse 55% 55% at 15% 25%,rgba(74,94,58,.08) 0%,transparent 65%),radial-gradient(ellipse 45% 45% at 85% 15%,rgba(74,94,58,.06) 0%,transparent 60%),radial-gradient(ellipse 60% 40% at 80% 80%,rgba(168,135,74,.07) 0%,transparent 60%),radial-gradient(ellipse 40% 55% at 10% 80%,rgba(58,95,120,.06) 0%,transparent 55%)}
+.home-contour{position:absolute;inset:0;opacity:.07;background-image:repeating-linear-gradient(15deg,transparent,transparent 38px,rgba(74,94,58,.7) 38px,rgba(74,94,58,.7) 39px)}
+.home-content{position:relative;z-index:2;padding:2rem;max-width:840px}
+.home-stamp{display:inline-flex;align-items:center;gap:10px;padding:6px 18px;margin-bottom:1.75rem;background:var(--surface);border:1.5px solid var(--border);border-radius:100px;box-shadow:var(--sh-sm);font-family:'JetBrains Mono',monospace;font-size:.66rem;letter-spacing:2px;text-transform:uppercase;color:var(--ink3);animation:riseIn .7s .1s both}
+.stamp-dot{width:6px;height:6px;border-radius:50%;background:var(--olive)}
+.home-title{font-family:'Cormorant Garamond',serif;font-size:clamp(3.5rem,9vw,7rem);font-weight:700;line-height:.92;letter-spacing:-1px;margin-bottom:1.75rem;animation:riseIn .7s .25s both}
+.ht-1{display:block;color:var(--ink)}
+.ht-2{display:block;color:var(--olive);font-style:italic}
+.ht-3{display:block;color:var(--ink3);font-weight:600;font-size:.6em;letter-spacing:4px;font-style:normal;font-family:'Outfit',sans-serif;margin-top:.6rem}
+.home-lead{font-size:clamp(.88rem,1.3vw,1rem);color:var(--ink2);line-height:1.8;font-weight:300;max-width:520px;margin:0 auto 2.25rem;animation:riseIn .7s .4s both}
+.class-chips{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin-bottom:2.25rem;animation:riseIn .7s .55s both}
+.chip{display:flex;align-items:center;gap:7px;padding:7px 17px;border-radius:8px;background:var(--surface);border:1.5px solid var(--border);font-size:.79rem;font-weight:500;color:var(--ink2);box-shadow:var(--sh-sm);transition:transform .15s,box-shadow .15s}
+.chip:hover{transform:translateY(-2px);box-shadow:var(--sh)}
+.chip-sw{width:9px;height:9px;border-radius:3px;flex-shrink:0}
+.home-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;animation:riseIn .7s .7s both}
+.btn-p{display:inline-flex;align-items:center;gap:7px;padding:11px 24px;border-radius:9px;background:var(--olive);color:#fff;font-family:'Outfit',sans-serif;font-size:.85rem;font-weight:600;border:none;cursor:pointer;box-shadow:0 4px 18px rgba(74,94,58,.35);transition:all .15s}
+.btn-p:hover{background:#3a4d2d;transform:translateY(-1px);box-shadow:0 6px 26px rgba(74,94,58,.45)}
+.btn-o{display:inline-flex;align-items:center;gap:7px;padding:10px 22px;border-radius:9px;background:var(--surface);color:var(--ink2);font-family:'Outfit',sans-serif;font-size:.85rem;font-weight:500;border:1.5px solid var(--border);cursor:pointer;box-shadow:var(--sh-sm);transition:all .15s}
+.btn-o:hover{border-color:var(--olive);color:var(--olive);transform:translateY(-1px)}
+.home-kpis{position:absolute;bottom:1.75rem;display:flex;gap:2.5rem;animation:riseIn .7s .9s both}
+.kpi{text-align:center}
+.kpi-v{font-family:'Cormorant Garamond',serif;font-size:2rem;font-weight:700;color:var(--olive);line-height:1}
+.kpi-l{font-family:'JetBrains Mono',monospace;font-size:.6rem;color:var(--ink3);letter-spacing:1.5px;text-transform:uppercase;margin-top:3px}
+.kpi-sep{width:1px;height:38px;background:var(--border);align-self:center}
+
+/* ══ SHARED CARD ══ */
+.card{background:var(--surface);border:1.5px solid var(--border);border-radius:13px;box-shadow:var(--sh-sm)}
+.card-p{padding:1.2rem}
+.card-title{font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink3);margin-bottom:.9rem}
+
+/* ══ YEAR BAR ══ */
+.yr-bar{display:flex;gap:6px;margin-bottom:1.4rem;flex-wrap:wrap}
+.yr-pill{padding:5px 15px;border-radius:100px;background:var(--surface);border:1.5px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:.72rem;font-weight:600;color:var(--ink3);cursor:pointer;transition:all .14s}
+.yr-pill:hover{border-color:var(--olive-pale);color:var(--olive)}
+.yr-pill.active{background:var(--olive);border-color:var(--olive);color:#fff}
+
+/* ══ STAT CARDS ══ */
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.9rem;margin-bottom:1.25rem}
+@media(max-width:960px){.stat-grid{grid-template-columns:repeat(2,1fr)}}
+.stat-card{background:var(--surface);border:1.5px solid var(--border);border-radius:13px;padding:1.1rem 1.1rem .9rem;position:relative;overflow:hidden;box-shadow:var(--sh-sm);transition:transform .14s,box-shadow .14s}
+.stat-card:hover{transform:translateY(-2px);box-shadow:var(--sh)}
+.stat-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
+.stat-card.urban::before{background:var(--urban)}
+.stat-card.veg::before{background:var(--veg)}
+.stat-card.water::before{background:var(--water)}
+.stat-card.bare::before{background:var(--bare)}
+.sc-r1{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.8rem}
+.sc-ico{font-size:1.3rem}
+.sc-badge{font-size:.6rem;font-family:'JetBrains Mono',monospace;padding:3px 8px;border-radius:4px;font-weight:600}
+.sc-badge.up{background:rgba(61,107,69,.12);color:#3D6B45}
+.sc-badge.down{background:rgba(139,64,73,.12);color:#8B4049}
+.sc-badge.neu{background:var(--ivory-warm);color:var(--ink3)}
+.sc-lbl{font-size:.65rem;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--ink3);margin-bottom:2px}
+.sc-num{font-family:'Cormorant Garamond',serif;font-size:2.2rem;font-weight:700;line-height:1;margin-bottom:2px}
+.stat-card.urban .sc-num{color:var(--urban)}
+.stat-card.veg .sc-num{color:var(--veg)}
+.stat-card.water .sc-num{color:var(--water)}
+.stat-card.bare .sc-num{color:var(--bare)}
+.sc-sub{font-size:.67rem;color:var(--ink3);margin-bottom:.8rem}
+.sc-track{height:4px;background:var(--ivory-deep);border-radius:2px;overflow:hidden}
+.sc-fill{height:100%;border-radius:2px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+.stat-card.urban .sc-fill{background:var(--urban)}
+.stat-card.veg .sc-fill{background:var(--veg)}
+.stat-card.water .sc-fill{background:var(--water)}
+.stat-card.bare .sc-fill{background:var(--bare)}
+
+/* Charts */
+.chart-row{display:grid;grid-template-columns:1.55fr 1fr;gap:.9rem;margin-bottom:.9rem}
+.chart-row2{display:grid;grid-template-columns:1fr 1fr;gap:.9rem}
+@media(max-width:900px){.chart-row,.chart-row2{grid-template-columns:1fr}}
+.cbox{background:var(--surface);border:1.5px solid var(--border);border-radius:13px;padding:1.1rem;box-shadow:var(--sh-sm)}
+.cbox-t{font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink3);margin-bottom:.9rem}
+.cbox-a{position:relative;height:210px}
+.cbox-a.sm{height:185px}
+
+/* ══ MAP PAGE ══ */
+.map-tools{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:.9rem}
+.tb{padding:6px 14px;border-radius:7px;background:var(--surface);border:1.5px solid var(--border);font-family:'Outfit',sans-serif;font-size:.78rem;font-weight:500;color:var(--ink2);cursor:pointer;transition:all .13s}
+.tb:hover{border-color:var(--olive-pale);color:var(--olive);background:var(--olive-wash)}
+.tb.active{background:var(--olive-wash);border-color:var(--olive-pale);color:var(--olive);font-weight:600}
+.tb-sep{width:1px;height:24px;background:var(--border)}
+.tb-sel{padding:6px 12px;border-radius:7px;background:var(--surface);border:1.5px solid var(--border);font-family:'Outfit',sans-serif;font-size:.78rem;color:var(--ink);cursor:pointer;appearance:none}
+.map-frame{border-radius:13px;overflow:hidden;border:1.5px solid var(--border);box-shadow:var(--sh);height:calc(100vh - 270px);min-height:340px;position:relative}
+#leaflet-map{width:100%;height:100%}
+.map-legend{position:absolute;bottom:.9rem;right:.9rem;z-index:500;background:rgba(250,247,240,.95);backdrop-filter:blur(10px);border:1.5px solid var(--border);border-radius:11px;padding:.85rem 1rem;box-shadow:var(--sh)}
+.lg-hd{font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink3);margin-bottom:.55rem}
+.lg-row{display:flex;align-items:center;gap:7px;font-size:.75rem;color:var(--ink2);margin-bottom:4px;font-weight:500}
+.lg-sw{width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.map-footer{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-top:.7rem}
+.mf-chip{font-family:'JetBrains Mono',monospace;font-size:.65rem;color:var(--ink3);background:var(--surface);border:1px solid var(--border);padding:3px 10px;border-radius:6px}
+.mf-chip b{color:var(--ink2)}
+
+/* ══ CHANGE DETECTION ══ */
+.cd-controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:1.2rem;padding:1rem 1.2rem;background:var(--surface);border:1.5px solid var(--border);border-radius:12px;box-shadow:var(--sh-sm)}
+.cd-label{font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink3)}
+.cd-sel{padding:7px 14px;border-radius:7px;background:var(--ivory-warm);border:1.5px solid var(--border);font-family:'Outfit',sans-serif;font-size:.82rem;color:var(--ink);cursor:pointer;appearance:none}
+.cd-arrow{font-size:1rem;color:var(--ink3)}
+.cd-mode-btns{display:flex;gap:5px;margin-left:auto}
+.cd-mb{padding:6px 14px;border-radius:7px;background:var(--surface);border:1.5px solid var(--border);font-family:'Outfit',sans-serif;font-size:.76rem;font-weight:500;color:var(--ink3);cursor:pointer;transition:all .13s}
+.cd-mb:hover{border-color:var(--olive-pale);color:var(--olive)}
+.cd-mb.active{background:var(--olive-wash);border-color:var(--olive-pale);color:var(--olive);font-weight:600}
+
+.cd-layout{display:grid;grid-template-columns:1.4fr 1fr;gap:1rem;margin-bottom:1rem}
+@media(max-width:1000px){.cd-layout{grid-template-columns:1fr}}
+.cd-map-frame{border-radius:13px;overflow:hidden;border:1.5px solid var(--border);box-shadow:var(--sh);height:400px;position:relative}
+#cd-map{width:100%;height:100%}
+.cd-map-legend{position:absolute;bottom:.9rem;right:.9rem;z-index:500;background:rgba(250,247,240,.95);backdrop-filter:blur(10px);border:1.5px solid var(--border);border-radius:11px;padding:.85rem 1rem;box-shadow:var(--sh);max-height:340px;overflow-y:auto}
+.cd-map-legend::-webkit-scrollbar{width:4px}
+.cd-map-legend::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.cd-right{display:flex;flex-direction:column;gap:.9rem}
+.cd-kpi-row{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+.cd-kpi{background:var(--surface);border:1.5px solid var(--border);border-radius:11px;padding:.9rem;box-shadow:var(--sh-sm);text-align:center}
+.cd-kpi-label{font-family:'JetBrains Mono',monospace;font-size:.58rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink3);margin-bottom:.3rem}
+.cd-kpi-val{font-family:'Cormorant Garamond',serif;font-size:1.7rem;font-weight:700;line-height:1;color:var(--ink)}
+.cd-kpi-val.gain{color:var(--gain)}
+.cd-kpi-val.loss{color:var(--loss)}
+.cd-kpi-sub{font-size:.68rem;color:var(--ink3);margin-top:2px}
+
+.cd-chart-box{background:var(--surface);border:1.5px solid var(--border);border-radius:11px;padding:1rem;box-shadow:var(--sh-sm)}
+.cd-chart-area{position:relative;height:180px}
+
+.cd-analysis{background:var(--surface);border:1.5px solid var(--border);border-radius:13px;padding:1.2rem;box-shadow:var(--sh-sm)}
+.cd-analysis-title{font-family:'Cormorant Garamond',serif;font-size:1.15rem;font-weight:700;color:var(--ink);margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem}
+.cd-analysis-body{font-size:.82rem;color:var(--ink2);line-height:1.85;font-weight:300}
+.cd-analysis-body p{margin-bottom:.6rem}
+.cd-analysis-body strong{color:var(--ink);font-weight:600}
+.cd-analysis-body em{color:var(--olive-mid);font-style:italic}
+
+/* ══ PREDICTION ══ */
+.pred-layout{display:grid;grid-template-columns:1.3fr 1fr;gap:1.2rem}
+@media(max-width:1000px){.pred-layout{grid-template-columns:1fr}}
+.pred-yr-tabs{display:flex;gap:6px;margin-bottom:1rem}
+.pred-tab{padding:7px 20px;border-radius:8px;background:var(--surface);border:1.5px solid var(--border);font-family:'JetBrains Mono',monospace;font-size:.75rem;font-weight:600;color:var(--ink3);cursor:pointer;transition:all .14s}
+.pred-tab:hover{border-color:var(--olive-pale);color:var(--olive)}
+.pred-tab.active{background:var(--olive);border-color:var(--olive);color:#fff}
+.pred-map-frame{border-radius:13px;overflow:hidden;border:1.5px solid var(--border);box-shadow:var(--sh);height:420px;position:relative}
+#pred-map{width:100%;height:100%}
+.pred-map-legend{position:absolute;bottom:.9rem;right:.9rem;z-index:500;background:rgba(250,247,240,.95);backdrop-filter:blur(10px);border:1.5px solid var(--border);border-radius:11px;padding:.85rem 1rem;box-shadow:var(--sh)}
+.pred-right{display:flex;flex-direction:column;gap:.9rem}
+.pred-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:.7rem}
+.pred-stat{background:var(--surface);border:1.5px solid var(--border);border-radius:11px;padding:.9rem;box-shadow:var(--sh-sm)}
+.pred-stat::before{content:'';display:block;height:3px;border-radius:2px;margin-bottom:.7rem}
+.pred-stat.urban::before{background:var(--urban)}
+.pred-stat.veg::before{background:var(--veg)}
+.pred-stat.water::before{background:var(--water)}
+.pred-stat.bare::before{background:var(--bare)}
+.ps-lbl{font-size:.63rem;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--ink3);margin-bottom:2px}
+.ps-val{font-family:'Cormorant Garamond',serif;font-size:1.6rem;font-weight:700;line-height:1;color:var(--ink)}
+.pred-stat.urban .ps-val{color:var(--urban)}
+.pred-stat.veg .ps-val{color:var(--veg)}
+.pred-stat.water .ps-val{color:var(--water)}
+.pred-stat.bare .ps-val{color:var(--bare)}
+.ps-sub{font-size:.65rem;color:var(--ink3);margin-top:2px}
+.ps-chg{font-size:.63rem;font-family:'JetBrains Mono',monospace;margin-top:.4rem;padding:2px 6px;border-radius:3px;display:inline-block}
+.ps-chg.up{background:rgba(61,107,69,.1);color:var(--veg)}
+.ps-chg.down{background:rgba(139,64,73,.1);color:var(--urban)}
+
+.pred-analysis{background:var(--surface);border:1.5px solid var(--border);border-radius:13px;padding:1.1rem;box-shadow:var(--sh-sm)}
+.pred-chart-box{background:var(--surface);border:1.5px solid var(--border);border-radius:13px;padding:1.1rem;box-shadow:var(--sh-sm)}
+.pred-chart-area{height:170px;position:relative}
+
+.causes-section{margin-top:1.2rem}
+.causes-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:.8rem}
+@media(max-width:1100px){.causes-grid{grid-template-columns:1fr 1fr}}
+.cause-card{background:var(--surface);border:1.5px solid var(--border);border-radius:12px;padding:1rem;box-shadow:var(--sh-sm);display:flex;gap:.8rem;align-items:flex-start;transition:transform .14s,box-shadow .14s}
+.cause-card:hover{transform:translateY(-2px);box-shadow:var(--sh)}
+.cause-ico{width:36px;height:36px;border-radius:9px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1rem}
+.cause-ico.r{background:rgba(139,64,73,.1)}
+.cause-ico.g{background:rgba(61,107,69,.1)}
+.cause-ico.b{background:rgba(58,95,120,.1)}
+.cause-ico.y{background:rgba(168,135,74,.1)}
+.cause-name{font-size:.8rem;font-weight:600;color:var(--ink);margin-bottom:3px}
+.cause-desc{font-size:.72rem;color:var(--ink3);line-height:1.65}
+
+/* ══ ABOUT ══ */
+.about-grid{display:grid;grid-template-columns:1fr 1fr;gap:2rem}
+@media(max-width:900px){.about-grid{grid-template-columns:1fr}}
+.about-prose{font-size:.85rem;color:var(--ink2);line-height:1.9;font-weight:300}
+.about-prose p{margin-bottom:.9rem}
+.about-prose strong{color:var(--ink);font-weight:600}
+.wf{display:flex;flex-direction:column;gap:.55rem;margin-top:1.4rem}
+.wf-s{display:flex;gap:.9rem;align-items:flex-start}
+.wf-n{width:25px;height:25px;border-radius:6px;flex-shrink:0;background:var(--olive-wash);border:1.5px solid var(--olive-pale);color:var(--olive);font-size:.66rem;font-weight:700;font-family:'JetBrains Mono',monospace;display:flex;align-items:center;justify-content:center}
+.wf-t{font-size:.8rem;font-weight:600;color:var(--ink);margin-bottom:2px}
+.wf-d{font-size:.71rem;color:var(--ink3);line-height:1.6}
+.meta-panel{background:var(--surface);border:1.5px solid var(--border);border-radius:13px;overflow:hidden;box-shadow:var(--sh-sm)}
+.meta-hd{padding:.85rem 1.2rem;background:var(--ivory-warm);border-bottom:1.5px solid var(--border);font-family:'Cormorant Garamond',serif;font-size:1rem;font-weight:700;color:var(--ink)}
+.meta-r{display:flex;justify-content:space-between;align-items:flex-start;padding:.75rem 1.2rem;border-bottom:1px solid var(--border)}
+.meta-r:last-child{border-bottom:none}
+.meta-k{font-size:.65rem;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--ink3);padding-top:2px}
+.meta-v{font-size:.79rem;color:var(--ink2);text-align:right;max-width:190px;line-height:1.5}
+
+@keyframes riseIn{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<div id="app">
+
+<header>
+  <div class="logo">
+    <div class="logo-em">🌿</div>
+    <div>
+      <div class="logo-name">LULC <span>Manouba</span></div>
+      <div class="logo-sub">Tunisia · 1985 — 2025</div>
+    </div>
+  </div>
+  <nav>
+    <button class="nb active" id="nb-home"  onclick="goTo('home')">⌂ Home</button>
+    <button class="nb"        id="nb-stats" onclick="goTo('stats')">◎ Statistics</button>
+    <button class="nb"        id="nb-map"   onclick="goTo('map')">◈ LULC Map</button>
+    <button class="nb"        id="nb-cd"    onclick="goTo('cd')">⇄ Change Detection</button>
+    <button class="nb"        id="nb-pred"  onclick="goTo('pred')">◉ Prediction</button>
+    <button class="nb"        id="nb-game"  onclick="window.open('manouba_advnced_ca_markov.html','_blank')">🎮 Markov Game</button>
+    <button class="nb"        id="nb-about" onclick="goTo('about')">◌ About</button>
+  </nav>
+</header>
+
+<div id="pages">
+
+<!-- ▸▸ HOME ◂◂ -->
+<div class="page active" id="pg-home">
+  <div class="home-wrap">
+    <div class="home-deco"></div><div class="home-contour"></div>
+    <div class="home-content">
+      <div class="home-stamp"><div class="stamp-dot"></div>Remote Sensing · GIS · Markov<div class="stamp-dot"></div></div>
+      <h1 class="home-title">
+        <span class="ht-1">Land Use &amp;</span>
+        <span class="ht-2">Land Cover</span>
+        <span class="ht-3">Manouba Governorate, Tunisia</span>
+      </h1>
+      <p class="home-lead">Four decades of environmental transformation — classified, mapped, detected, and projected across four land cover classes using multi-temporal satellite imagery from 1985 to 2025.</p>
+      <div class="class-chips">
+        <div class="chip"><div class="chip-sw" style="background:var(--urban)"></div>Urban</div>
+        <div class="chip"><div class="chip-sw" style="background:var(--veg)"></div>Vegetation</div>
+        <div class="chip"><div class="chip-sw" style="background:var(--water)"></div>Water</div>
+        <div class="chip"><div class="chip-sw" style="background:var(--bare)"></div>Bare Soil</div>
+      </div>
+      <div class="home-actions">
+        <button class="btn-p" onclick="goTo('stats')">◎ Statistics</button>
+        <button class="btn-o" onclick="goTo('map')">◈ LULC Map</button>
+        <button class="btn-o" onclick="goTo('cd')">⇄ Change Detection</button>
+        <button class="btn-o" onclick="goTo('pred')">◉ Prediction</button>
+      </div>
+    </div>
+    <div class="home-kpis">
+      <div class="kpi"><div class="kpi-v">40</div><div class="kpi-l">Years</div></div>
+      <div class="kpi-sep"></div>
+      <div class="kpi"><div class="kpi-v">8</div><div class="kpi-l">Epochs</div></div>
+      <div class="kpi-sep"></div>
+      <div class="kpi"><div class="kpi-v">4</div><div class="kpi-l">Classes</div></div>
+      <div class="kpi-sep"></div>
+      <div class="kpi"><div class="kpi-v">~320</div><div class="kpi-l">km²</div></div>
+      <div class="kpi-sep"></div>
+      <div class="kpi"><div class="kpi-v">3</div><div class="kpi-l">Projections</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ▸▸ STATISTICS ◂◂ -->
+<div class="page" id="pg-stats">
+  <div class="pgh">
+    <div class="pgh-label">01 — Land Cover Analysis</div>
+    <h2 class="pgh-title">Class <em>Breakdown</em> by Year</h2>
+    <p class="pgh-desc">Select an epoch to update all statistics and charts. Areas are computed from the GeoJSON attribute table and expressed in km².</p>
+  </div>
+  <div class="yr-bar" id="yr-bar"></div>
+  <div class="stat-grid" id="stat-grid"></div>
+  <div class="chart-row">
+    <div class="cbox"><div class="cbox-t">Temporal Evolution 1985–2025 (km²)</div><div class="cbox-a"><canvas id="c-line"></canvas></div></div>
+    <div class="cbox"><div class="cbox-t">Distribution — Selected Year</div><div class="cbox-a"><canvas id="c-donut"></canvas></div></div>
+  </div>
+  <div style="height:.85rem"></div>
+  <div class="chart-row2">
+    <div class="cbox"><div class="cbox-t">Decadal Comparison (km²)</div><div class="cbox-a sm"><canvas id="c-bar"></canvas></div></div>
+    <div class="cbox"><div class="cbox-t">Urban Expansion per Epoch (km²)</div><div class="cbox-a sm"><canvas id="c-urban"></canvas></div></div>
+  </div>
+</div>
+
+<!-- ▸▸ LULC MAP ◂◂ -->
+<div class="page" id="pg-map">
+  <div class="pgh">
+    <div class="pgh-label">02 — Spatial Viewer</div>
+    <h2 class="pgh-title">LULC <em>Classification Map</em></h2>
+    <p class="pgh-desc">Select a basemap and epoch.</p>
+  </div>
+  <div class="map-tools">
+    <button class="tb active" onclick="setBase('sat',this)">🛰 Satellite</button>
+    <button class="tb" onclick="setBase('osm',this)">🗺 Streets</button>
+    <button class="tb" onclick="setBase('topo',this)">⛰ Topo</button>
+    <div class="tb-sep"></div>
+    <select class="tb-sel" id="lulc-yr-sel" onchange="lulcSwitchYear(+this.value)"></select>
+    <button class="tb" onclick="lulcFit()">⊡ Fit</button>
+    <button class="tb" onclick="lulcClear()">✕ Clear</button>
+  </div>
+  <div class="map-frame">
+    <div id="leaflet-map"></div>
+    <div class="map-legend">
+      <div class="lg-hd">Land Cover</div>
+      <div class="lg-row"><div class="lg-sw" style="background:var(--urban)"></div>Urban</div>
+      <div class="lg-row"><div class="lg-sw" style="background:var(--veg)"></div>Vegetation</div>
+      <div class="lg-row"><div class="lg-sw" style="background:var(--water)"></div>Water</div>
+      <div class="lg-row"><div class="lg-sw" style="background:var(--bare)"></div>Bare Soil</div>
+    </div>
+  </div>
+  <div class="map-footer">
+    <div class="mf-chip">📍 <b>Manouba Governorate</b> · 36.82°N, 9.97°E</div>
+    <div class="mf-chip" id="lulc-chip-yr">Epoch: <b>2025</b></div>
+    <div class="mf-chip" id="lulc-chip-gj">GeoJSON: <b>not embedded</b></div>
+  </div>
+</div>
+
+<!-- ▸▸ CHANGE DETECTION ◂◂ -->
+<div class="page" id="pg-cd">
+  <div class="pgh">
+    <div class="pgh-label">03 — Change Detection</div>
+    <h2 class="pgh-title">Spatial <em>Change Analysis</em></h2>
+    <p class="pgh-desc">Compare transitions between 1985 and 2025. Global mode shows all 16 transitions. Per-class modes highlight gain, loss, and stable areas.</p>
+  </div>
+  <div class="cd-controls">
+    <div class="cd-label">From</div>
+    <select class="cd-sel" id="cd-from" onchange="updateCD()"></select>
+    <div class="cd-arrow">→</div>
+    <select class="cd-sel" id="cd-to" onchange="updateCD()"></select>
+    <div class="cd-mode-btns">
+      <button class="cd-mb active" id="cdm-global" onclick="setCDMode('global')">◎ Global</button>
+      <button class="cd-mb urban"  id="cdm-urban"  onclick="setCDMode('urban')">🏙 Urban</button>
+      <button class="cd-mb veg"    id="cdm-veg"    onclick="setCDMode('veg')">🌿 Vegetation</button>
+      <button class="cd-mb water"  id="cdm-water"  onclick="setCDMode('water')">💧 Water</button>
+      <button class="cd-mb bare"   id="cdm-bare"   onclick="setCDMode('bare')">🏜 Bare Soil</button>
+    </div>
+  </div>
+  <div class="cd-layout">
+    <div>
+      <div class="cd-map-frame">
+        <div id="cd-map"></div>
+        <div class="cd-map-legend">
+          <div class="lg-hd" id="cd-legend-title">Change Legend</div>
+          <div id="cd-legend-items"></div>
+        </div>
+      </div>
+    </div>
+    <div class="cd-right">
+      <div class="cd-kpi-row" id="cd-kpis"></div>
+      <div class="cd-chart-box">
+        <div class="cbox-t" id="cd-chart-title">Area Change by Class (km²)</div>
+        <div class="cd-chart-area"><canvas id="c-cd"></canvas></div>
+      </div>
+    </div>
+  </div>
+  <div class="cd-analysis" id="cd-analysis-box">
+    <div class="cd-analysis-title" id="cd-analysis-title">🔬 Scientific Analysis</div>
+    <div class="cd-analysis-body" id="cd-analysis-body">Select a year pair to load the contextual analysis.</div>
+  </div>
+</div>
+
+<!-- ▸▸ PREDICTION ◂◂ -->
+<div class="page" id="pg-pred">
+  <div class="pgh">
+    <div class="pgh-label">04 — Markov Prediction</div>
+    <h2 class="pgh-title">Future <em>Land Cover</em> Scenarios</h2>
+    <p class="pgh-desc">Projected land cover for 2030, 2035, and 2040 modelled via Cellular Automaton–Markov chain simulation calibrated on 1985–2025 transition matrices.</p>
+  </div>
+  <div style="margin-bottom:1rem;display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+    <button id="gen-pred-btn" onclick="generatePredictions()" style="
+      display:flex;align-items:center;gap:8px;padding:10px 22px;
+      border-radius:10px;background:var(--olive);border:none;
+      font-family:'Outfit',sans-serif;font-size:.85rem;font-weight:700;
+      color:#fff;cursor:pointer;box-shadow:0 4px 18px rgba(74,94,58,.35);
+      transition:all .14s;">
+      🔮 Generate Prediction Maps (2030 · 2035 · 2040)
+    </button>
+    <div id="gen-pred-status" style="font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--ink3);">
+      Requires server.py running — <code>python server.py</code>
+    </div>
+  </div>
+  <div class="pred-yr-tabs">
+    <button class="pred-tab active" id="pt-2030" onclick="switchPred(2030)">2030</button>
+    <button class="pred-tab"        id="pt-2035" onclick="switchPred(2035)">2035</button>
+    <button class="pred-tab"        id="pt-2040" onclick="switchPred(2040)">2040</button>
+  </div>
+  <div class="pred-layout">
+    <div>
+      <div class="pred-map-frame">
+        <div id="pred-map"></div>
+        <div class="pred-map-legend">
+          <div class="lg-hd">Predicted Cover</div>
+          <div class="lg-row"><div class="lg-sw" style="background:var(--urban)"></div>Urban</div>
+          <div class="lg-row"><div class="lg-sw" style="background:var(--veg)"></div>Vegetation</div>
+          <div class="lg-row"><div class="lg-sw" style="background:var(--water)"></div>Water</div>
+          <div class="lg-row"><div class="lg-sw" style="background:var(--bare)"></div>Bare Soil</div>
+        </div>
+      </div>
+      <div style="height:.9rem"></div>
+      <div class="pred-chart-box">
+        <div class="cbox-t">Projected Area Evolution 2025→2040 (km²)</div>
+        <div class="pred-chart-area"><canvas id="c-pred-line"></canvas></div>
+      </div>
+    </div>
+    <div class="pred-right">
+      <div class="pred-stat-grid" id="pred-stats"></div>
+      <div class="pred-analysis">
+        <div class="cbox-t" id="pred-analysis-yr">Scenario Analysis — 2030</div>
+        <div class="cd-analysis-body" id="pred-analysis-text"></div>
+      </div>
+      <div class="cbox card-p">
+        <div class="cbox-t">Class Distribution — Selected Year</div>
+        <div class="cbox-a sm"><canvas id="c-pred-donut"></canvas></div>
+      </div>
+    </div>
+  </div>
+  <div class="causes-section">
+    <div style="font-family:'JetBrains Mono',monospace;font-size:.62rem;letter-spacing:1.5px;text-transform:uppercase;color:var(--ink3);margin-bottom:.85rem">Drivers of Projected Change</div>
+    <div class="causes-grid">
+      <div class="cause-card"><div class="cause-ico r">🏗</div><div><div class="cause-name">Urban Sprawl &amp; Demographic Pressure</div><div class="cause-desc">Continued population growth in Greater Tunis drives residential and industrial expansion deep into Manouba's periurban zone, consuming agricultural and bare land at a projected rate of 5–8 km²/yr through 2040.</div></div></div>
+      <div class="cause-card"><div class="cause-ico g">🌾</div><div><div class="cause-name">Agricultural Land Abandonment</div><div class="cause-desc">Rural-urban migration reduces farming intensity. Olive groves and cereal plots, when left unmanaged, shift toward bare soil or are annexed by informal construction, accelerating the vegetation decline signal.</div></div></div>
+      <div class="cause-card"><div class="cause-ico b">💧</div><div><div class="cause-name">Hydrological Regime Shifts</div><div class="cause-desc">Upstream Sidi Salem dam regulation and increasing irrigation extraction shrink Medjerda river-adjacent water bodies. Climate projections for North Africa indicate −10 to −20% annual rainfall by 2040.</div></div></div>
+      <div class="cause-card"><div class="cause-ico y">🏜</div><div><div class="cause-name">Soil Sealing &amp; Erosion</div><div class="cause-desc">Impermeable surface expansion accelerates runoff, reducing infiltration and topsoil regeneration. Combined with accelerated erosion on devegetated slopes, bare soil patches are projected to persist and expand.</div></div></div>
+      <div class="cause-card"><div class="cause-ico r">🏭</div><div><div class="cause-name">Infrastructure Corridors</div><div class="cause-desc">Planned highway upgrades and the Tunis logistics hub development will permanently seal an estimated 12–18 km² of currently vegetated or agricultural land between 2025 and 2040.</div></div></div>
+      <div class="cause-card"><div class="cause-ico b">🌡</div><div><div class="cause-name">Climate Change Amplification</div><div class="cause-desc">CMIP6 projections for North Africa show +1.5–2.5°C warming by 2040 relative to 2000 baseline, extending dry season length and intensifying heat stress on existing vegetation cover in low-elevation zones.</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ▸▸ ABOUT ◂◂ -->
+<div class="page" id="pg-about">
+  <div class="pgh">
+    <div class="pgh-label">05 — Study Information</div>
+    <h2 class="pgh-title">About <em>the Project</em></h2>
+  </div>
+  <div class="about-grid">
+    <div>
+      <div class="about-prose">
+        <p>This project documents <strong>40 years of Land Use and Land Cover change</strong> in the Manouba governorate of Tunisia, using multi-temporal satellite imagery classified into four primary land cover classes: Urban, Vegetation, Water, and Bare Soil.</p>
+        <p>The study period from <strong>1985 to 2025</strong> spans key socioeconomic transitions — from agrarian land use patterns prior to liberalization, through to rapid suburban expansion driven by Greater Tunis growth pressure.</p>
+        <p>Classification was performed on <strong>Landsat 5 TM, Landsat 7 ETM+, Landsat 8 OLI</strong>, and <strong>Sentinel-2 MSI</strong> imagery using supervised classification algorithms. Change detection layers record transitions between epochs and are distributed as GeoJSON.</p>
+        <p>Future projections leverage <strong>Markov chain modeling</strong> and cellular automaton simulation, calibrated on observed land cover transition matrices derived from the 1985–2025 classification series, projecting scenarios to 2040.</p>
+      </div>
+      <div class="wf">
+        <div class="wf-s"><div class="wf-n">01</div><div><div class="wf-t">Image Acquisition</div><div class="wf-d">Landsat 5/7/8 & Sentinel-2 scenes, cloud cover &lt;10%, per epoch</div></div></div>
+        <div class="wf-s"><div class="wf-n">02</div><div><div class="wf-t">Preprocessing</div><div class="wf-d">Atmospheric correction, radiometric calibration, geometric co-registration</div></div></div>
+        <div class="wf-s"><div class="wf-n">03</div><div><div class="wf-t">Classification</div><div class="wf-d">Supervised SVM/RF into 4 classes; per-epoch OA & Kappa accuracy assessment</div></div></div>
+        <div class="wf-s"><div class="wf-n">04</div><div><div class="wf-t">Change Detection</div><div class="wf-d">Post-classification comparison, transition matrices, per-class gain/loss GeoJSONs</div></div></div>
+        <div class="wf-s"><div class="wf-n">05</div><div><div class="wf-t">Prediction</div><div class="wf-d">Markov model calibrated on 1985–2025 matrices; 2030–2040 projections</div></div></div>
+      </div>
+    </div>
+    <div>
+      <div class="meta-panel">
+        <div class="meta-hd">Project Metadata</div>
+        <div class="meta-r"><span class="meta-k">Study Area</span><span class="meta-v">Manouba Governorate, Tunisia</span></div>
+        <div class="meta-r"><span class="meta-k">Period</span><span class="meta-v">1985 — 2025 (8 epochs)</span></div>
+        <div class="meta-r"><span class="meta-k">Classes</span><span class="meta-v">Urban · Vegetation · Water · Bare Soil</span></div>
+        <div class="meta-r"><span class="meta-k">Data Sources</span><span class="meta-v">Landsat 5/7/8 · Sentinel-2 (ESA/USGS)</span></div>
+        <div class="meta-r"><span class="meta-k">Classification</span><span class="meta-v">Supervised SVM / Random Forest</span></div>
+        <div class="meta-r"><span class="meta-k">Change Detection</span><span class="meta-v">Post-classification comparison per pair</span></div>
+        <div class="meta-r"><span class="meta-k">Prediction Method</span><span class="meta-v">Markov Prediction Model </span></div>
+        <div class="meta-r"><span class="meta-k">Output Format</span><span class="meta-v">GeoJSON Vector Layers (EPSG:4326)</span></div>
+        <div class="meta-r"><span class="meta-k">Software</span><span class="meta-v">QGIS · Google Earth Engine · TerrSet</span></div>
+        <div class="meta-r"><span class="meta-k">Study Extent</span><span class="meta-v">~320 km²</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /pages -->
+</div><!-- /app -->
+<script>
+/* ════════════════════════════════════════════════════════════════
+   DATA STORES
+   ════════════════════════════════════════════════════════════════ */
+const GEOJSON_LULC = {
+  1985:null,1988:null,1991:null,1994:null,1997:null,2000:null,
+  2003:null,2006:null,2009:null,2012:null,2015:null,2018:null,
+  2021:null,2025:null,
+};
+
+/* CD: only stores the global layer — JS handles per-class filtering */
+const GEOJSON_CD = {
+  "1985_2025": { global: null },
+};
+
+const GEOJSON_PRED = { 2030:null, 2035:null, 2040:null };
+
+/* ════════════════════════════════════════════════════════════════
+   CONSTANTS — colors match your CSS variables
+   ════════════════════════════════════════════════════════════════ */
+const YEARS     = [1985,1988,1991,1994,1997,2000,2003,2006,2009,2012,2015,2018,2021,2025];
+const PRED_YEARS= [2030,2035,2040];
+const CLS       = ['urban','veg','water','bare'];
+const COLORS    = {urban:'#f31b1b', veg:'#104405', water:'#3F51B5', bare:'#ccb545'};
+const LABELS    = {urban:'Urban', veg:'Vegetation', water:'Water', bare:'Bare Soil'};
+const ICONS     = {urban:'🏙', veg:'🌿', water:'💧', bare:'🏜'};
+const TOTAL     = 990;
+const AREA_FIELD= 'area_km2';
+
+/* Class integer codes: 1=Water, 2=Urban, 3=Vegetation, 4=Bare Soil */
+const CLASS_INT_NAME = {1:'Water', 2:'Urban', 3:'Vegetation', 4:'Bare Soil'};
+const CLASS_INT_KEY  = {1:'water', 2:'urban', 3:'veg', 4:'bare'};
+const CLASS_KEY_INT  = {water:1, urban:2, veg:3, bare:4};
+
+/* Transition colors — each "X→Y" gets a unique color
+   Diagonal = stable (uses class color)
+   Off-diagonal = colored by DESTINATION class */
+const TRANS_COLORS = {
+  '1→1':'#3F51B5', '1→2':'#C62828', '1→3':'#2E7D32', '1→4':'#F9A825',
+  '2→1':'#5C6BC0', '2→2':'#f31b1b', '2→3':'#388E3C', '2→4':'#F57F17',
+  '3→1':'#7986CB', '3→2':'#E53935', '3→3':'#104405', '3→4':'#FBC02D',
+  '4→1':'#9FA8DA', '4→2':'#EF5350', '4→3':'#4CAF50', '4→4':'#ccb545',
+};
+
+/* Per-class gain/loss/stable colors (lighter tints for the map) */
+const CD_COLORS_CLASS = {
+  urban: {gain:'#E57373', loss:'#7B1FA2', stable:'#FFCDD2'},
+  veg:   {gain:'#81C784', loss:'#1B5E20', stable:'#C8E6C9'},
+  water: {gain:'#64B5F6', loss:'#0D47A1', stable:'#BBDEFB'},
+  bare:  {gain:'#FFD54F', loss:'#E65100', stable:'#FFF9C4'},
+};
+
+/* ════════════════════════════════════════════════════════════════
+   CLASS EXTRACTION (for LULC and Prediction GeoJSONs)
+   ════════════════════════════════════════════════════════════════ */
+const CLASS_MAP={
+  'urban':'urban','urbain':'urban','built-up':'urban','urban area':'urban',
+  'builtup':'urban','buitup':'urban','buitlup':'urban',
+  'vegetation':'veg','veg':'veg','végétation':'veg','forest':'veg','cropland':'veg',
+  'water':'water','eau':'water','water body':'water','waterbody':'water',
+  'bare':'bare','bare soil':'bare','baresoil':'bare','sol':'bare','sol nu':'bare',
+  'sand':'bare','barren':'bare',
+};
+const CLASS_INT_MAP = {1:'water', 2:'urban', 3:'veg', 4:'bare'};
+
+function extractClass(p) {
+  if (p.class_name && typeof p.class_name === 'string')
+    return CLASS_MAP[p.class_name.toLowerCase().trim()] || 'bare';
+  const cv = p.class !== undefined ? p.class : p.Class;
+  if (typeof cv === 'number') return CLASS_INT_MAP[cv] || 'bare';
+  if (typeof cv === 'string' && cv) return CLASS_MAP[cv.toLowerCase().trim()] || 'bare';
+  return 'bare';
+}
+
+function extractLabel(p) {
+  const intNames = {1:'Water',2:'Urban',3:'Vegetation',4:'Bare Soil'};
+  const cv = p.class !== undefined ? p.class : p.Class;
+  if (p.class_name && typeof p.class_name === 'string') return p.class_name;
+  if (typeof cv === 'number') return intNames[cv] || 'Unknown';
+  if (typeof cv === 'string' && cv) return cv;
+  return 'Unknown';
+}
+
+/* ════════════════════════════════════════════════════════════════
+   UTM → WGS84 REPROJECTION
+   ════════════════════════════════════════════════════════════════ */
+function utmToWgs84(e, n) {
+  const a=6378137,f=1/298.257223563,k0=0.9996,e2=2*f-f*f;
+  const zone=32,lon0=(zone*6-183)*Math.PI/180;
+  const M=n/k0,mu=M/(a*(1-e2/4-3*e2*e2/64-5*e2*e2*e2/256));
+  const e1=(1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2));
+  const fp=mu+(3*e1/2-27*e1*e1*e1/32)*Math.sin(2*mu)
+    +(21*e1*e1/16-55*e1*e1*e1*e1/32)*Math.sin(4*mu)
+    +(151*e1*e1*e1/96)*Math.sin(6*mu)
+    +(1097*e1*e1*e1*e1/512)*Math.sin(8*mu);
+  const C1=e2*Math.cos(fp)*Math.cos(fp)/(1-e2);
+  const T1=Math.tan(fp)*Math.tan(fp);
+  const N1=a/Math.sqrt(1-e2*Math.sin(fp)*Math.sin(fp));
+  const R1=a*(1-e2)/Math.pow(1-e2*Math.sin(fp)*Math.sin(fp),1.5);
+  const D=(e-500000)/(N1*k0);
+  const lat=(fp-(N1*Math.tan(fp)/R1)*(D*D/2
+    -(5+3*T1+10*C1-4*C1*C1-9*e2/(1-e2))*D*D*D*D/24
+    +(61+90*T1+298*C1+45*T1*T1-3*C1*C1-252*e2/(1-e2))*D*D*D*D*D*D/720))*180/Math.PI;
+    const lon=lon0+(D-(1+2*T1+C1)*D*D*D/6
+    +(5-2*C1+28*T1-3*C1*C1+8*e2/(1-e2)+24*T1*T1)*D*D*D*D*D/120)/Math.cos(fp);
+  return [lon*180/Math.PI, lat];
+}
+function convertRing(ring){ return ring.map(([e,n])=>utmToWgs84(e,n)); }
+function ensureWgs84(gj){
+  if(!gj||!gj.features||!gj.features.length) return gj;
+  let fv=gj.features[0]?.geometry?.coordinates;
+  while(Array.isArray(fv?.[0])) fv=fv[0];
+  if(Math.abs(fv[0])<=180) return gj;
+  console.log('Reprojecting UTM→WGS84...');
+  const c=JSON.parse(JSON.stringify(gj));
+  c.crs={type:'name',properties:{name:'EPSG:4326'}};
+  c.features.forEach(f=>{
+    const g=f.geometry; if(!g) return;
+    if(g.type==='Polygon') g.coordinates=g.coordinates.map(convertRing);
+    else if(g.type==='MultiPolygon') g.coordinates=g.coordinates.map(p=>p.map(convertRing));
+  });
+  return c;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   AREA CALCULATION
+   ════════════════════════════════════════════════════════════════ */
+function _geomAreaKm2(geom){
+  if(!geom) return 0;
+  let rings=[];
+  if(geom.type==='Polygon') rings=[geom.coordinates[0]];
+  else if(geom.type==='MultiPolygon') rings=geom.coordinates.map(p=>p[0]);
+  let total=0;
+  rings.forEach(ring=>{
+    if(!ring||ring.length<3) return;
+    let a=0; const n=ring.length;
+    for(let i=0;i<n;i++){const j=(i+1)%n; a+=ring[i][0]*ring[j][1]-ring[j][0]*ring[i][1];}
+    a=Math.abs(a)/2;
+    const avgLat=ring.reduce((s,c)=>s+c[1],0)/n;
+    total += Math.abs(ring[0][0])>180 ? a/1e6 : a*111.0*111.0*Math.cos(avgLat*Math.PI/180);
+  });
+  return total;
+}
+function calcAreas(gj){
+  if(!gj||!gj.features) return null;
+  const r={urban:0,veg:0,water:0,bare:0};
+  gj.features.forEach(f=>{
+    const cls=extractClass(f.properties||{});
+    let area=parseFloat((f.properties||{})[AREA_FIELD]||(f.properties||{}).area||(f.properties||{}).Area||0);
+    if(!area) area=_geomAreaKm2(f.geometry);
+    r[cls]+=area;
+  });
+  const t=Object.values(r).reduce((a,b)=>a+b,0);
+  if(t>100000) Object.keys(r).forEach(k=>r[k]/=1e6);
+  return Object.values(r).some(v=>v>0)?r:null;
+}
+
+const DATA_FALLBACK={
+  1985:{urban:47,veg:231.4,water:12.4,bare:699.4},1988:{urban:55,veg:225,water:12,bare:698},
+  1991:{urban:65,veg:218,water:11.5,bare:695.5},1994:{urban:78,veg:210,water:11,bare:691},
+  1997:{urban:94,veg:200,water:10.5,bare:685.5},2000:{urban:113,veg:188,water:10,bare:679},
+  2003:{urban:135,veg:175,water:9.5,bare:670.5},2006:{urban:158,veg:161,water:9,bare:662},
+  2009:{urban:182,veg:147,water:8.5,bare:652.5},2012:{urban:207,veg:133,water:8,bare:642},
+  2015:{urban:232,veg:119,water:7.5,bare:631.5},2018:{urban:258,veg:105,water:7,bare:620},
+  2021:{urban:282,veg:93,water:6.5,bare:608.5},2025:{urban:304,veg:81,water:6,bare:599},
+};
+const PRED_FALLBACK={2030:{urban:230,veg:44,water:5,bare:41},2035:{urban:248,veg:36,water:5,bare:31},2040:{urban:262,veg:30,water:4,bare:24}};
+
+function getData(yr){
+  const gj=GEOJSON_LULC[yr];
+  if(gj){const a=calcAreas(gj);if(a&&Object.values(a).some(v=>v>0)) return a;}
+  const fb=DATA_FALLBACK[yr];
+  return fb?{...fb}:{urban:0,veg:0,water:0,bare:0};
+}
+function getPredData(yr){return calcAreas(GEOJSON_PRED[yr])||PRED_FALLBACK[yr]||{urban:0,veg:0,water:0,bare:0};}
+
+/* ════════════════════════════════════════════════════════════════
+   PAGE NAVIGATION
+   ════════════════════════════════════════════════════════════════ */
+let lulcMapBooted=false, cdMapBooted=false, predMapBooted=false;
+function goTo(id){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
+  document.getElementById('pg-'+id).classList.add('active');
+  document.getElementById('nb-'+id).classList.add('active');
+  if(id==='map'  &&!lulcMapBooted){setTimeout(bootLulcMap,80);lulcMapBooted=true;}
+  if(id==='cd'   &&!cdMapBooted) {setTimeout(bootCDMap,80);cdMapBooted=true;}
+  if(id==='pred' &&!predMapBooted){setTimeout(bootPredMap,80);predMapBooted=true;}
+}
+
+/* ════════════════════════════════════════════════════════════════
+   STATISTICS
+   ════════════════════════════════════════════════════════════════ */
+let selYear=2025, lineC, donutC, barC, urbanC;
+
+function buildYearBar(){
+  const el=document.getElementById('yr-bar');
+  YEARS.forEach(y=>{
+    const b=document.createElement('button');
+    b.className='yr-pill'+(y===selYear?' active':'');
+    b.textContent=y; b.id='yp-'+y;
+    b.onclick=()=>{selYear=y;refreshStats();};
+    el.appendChild(b);
+  });
+}
+function buildStatCards(){
+  const g=document.getElementById('stat-grid'); g.innerHTML='';
+  const d=getData(selYear), pi=YEARS.indexOf(selYear), prev=pi>0?getData(YEARS[pi-1]):null;
+  CLS.forEach(cls=>{
+    const v=+(d[cls]||0),tot=Object.values(d).reduce((a,b)=>a+(b||0),0)||TOTAL;
+    const pct=((v/tot)*100).toFixed(1), diff=prev?(v-(prev[cls]||0)):0;
+    const dp=prev&&prev[cls]?((diff/prev[cls])*100).toFixed(1):0;
+    const bc=!prev?'neu':diff>0?'up':'down', bt=!prev?'—':(diff>0?'▲ ':'▼ ')+Math.abs(dp)+'%';
+    const c=document.createElement('div'); c.className=`stat-card ${cls}`;
+    c.innerHTML=`<div class="sc-r1"><div class="sc-ico">${ICONS[cls]}</div><div class="sc-badge ${bc}">${bt}</div></div>
+<div class="sc-lbl">${LABELS[cls]}</div><div class="sc-num">${v.toFixed?v.toFixed(1):v}</div>
+<div class="sc-sub">${pct}% of study area</div>
+<div class="sc-track"><div class="sc-fill" style="width:${pct}%"></div></div>`;
+    g.appendChild(c);
+  });
+}
+const GRID_C='rgba(74,94,58,.07)',TICK_C='#8A7E6A';
+const BASE_OPT={responsive:true,maintainAspectRatio:false,
+  plugins:{legend:{labels:{color:'#4A4235',font:{family:'Outfit',size:11},padding:12,boxWidth:11,boxHeight:11}}},
+  scales:{x:{ticks:{color:TICK_C,font:{family:'JetBrains Mono',size:10}},grid:{color:GRID_C}},
+          y:{ticks:{color:TICK_C,font:{family:'JetBrains Mono',size:10}},grid:{color:GRID_C}}}};
+function buildCharts(){
+  lineC=new Chart(document.getElementById('c-line'),{type:'line',
+    data:{labels:YEARS.map(String),datasets:CLS.map(c=>({
+      label:LABELS[c],data:YEARS.map(y=>getData(y)[c]),
+      borderColor:COLORS[c],backgroundColor:COLORS[c]+'1A',
+      fill:true,tension:.45,borderWidth:2.5,pointRadius:4,pointHoverRadius:7,pointBackgroundColor:COLORS[c]
+    }))},options:{...BASE_OPT,interaction:{mode:'index',intersect:false}}});
+  donutC=new Chart(document.getElementById('c-donut'),{type:'doughnut',
+    data:{labels:CLS.map(c=>LABELS[c]),datasets:[{data:CLS.map(c=>getData(selYear)[c]),
+      backgroundColor:CLS.map(c=>COLORS[c]),borderWidth:0,hoverOffset:6}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'65%',
+      plugins:{legend:{position:'bottom',labels:{color:'#4A4235',font:{family:'Outfit',size:11},padding:10,boxWidth:11,boxHeight:11}}}}});
+  const dec=[1985,1995,2005,2015,2025];
+  barC=new Chart(document.getElementById('c-bar'),{type:'bar',
+    data:{labels:dec.map(String),datasets:CLS.map(c=>({
+      label:LABELS[c],data:dec.map(y=>getData(y)[c]),backgroundColor:COLORS[c]+'BB',borderRadius:4}))},
+    options:{...BASE_OPT}});
+  const rates=YEARS.slice(1).map((y,i)=>getData(y).urban-getData(YEARS[i]).urban);
+  urbanC=new Chart(document.getElementById('c-urban'),{type:'bar',
+    data:{labels:YEARS.slice(1).map((y,i)=>`${YEARS[i]}–${y}`),
+      datasets:[{label:'Urban Growth (km²)',data:rates,backgroundColor:COLORS.urban+'AA',borderRadius:4}]},
+    options:{...BASE_OPT,plugins:{legend:{display:false}}}});
+}
+function refreshStats(){
+  YEARS.forEach(y=>document.getElementById('yp-'+y)?.classList.toggle('active',y===selYear));
+  buildStatCards();
+  if(donutC){donutC.data.datasets[0].data=CLS.map(c=>getData(selYear)[c]);donutC.update();}
+}
+function rebuildCharts(){
+  if(lineC){CLS.forEach((c,i)=>{lineC.data.datasets[i].data=YEARS.map(y=>getData(y)[c]);});lineC.update();}
+  if(barC){const dec=[1985,1997,2009,2021,2025];CLS.forEach((c,i)=>{barC.data.datasets[i].data=dec.map(y=>getData(y)[c]);});barC.update();}
+  const rates=YEARS.slice(1).map((y,i)=>getData(y).urban-getData(YEARS[i]).urban);
+  if(urbanC){urbanC.data.datasets[0].data=rates;urbanC.update();}
+  buildStatCards();
+  if(donutC){donutC.data.datasets[0].data=CLS.map(c=>getData(selYear)[c]);donutC.update();}
+}
+
+/* ════════════════════════════════════════════════════════════════
+   LULC MAP
+   ════════════════════════════════════════════════════════════════ */
+let lmap, lBases={}, lGJLayer=null;
+function bootLulcMap(){
+  lmap=L.map('leaflet-map',{zoomControl:false}).setView([36.82,9.97],11);
+  L.control.zoom({position:'bottomleft'}).addTo(lmap);
+  lBases.sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Esri',maxZoom:19});
+  lBases.osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:19});
+  lBases.topo=L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{attribution:'© OTM',maxZoom:17});
+  lBases.sat.addTo(lmap);
+  setTimeout(()=>{lmap.invalidateSize();lmap.setView([36.82,9.97],11);},150);
+  const s=document.getElementById('lulc-yr-sel');
+  [1985,1988,1991,1994,1997,2000,2003,2006,2009,2012,2015,2018,2021,2025].forEach(y=>{
+    const o=document.createElement('option');o.value=y;o.textContent='Epoch '+y;if(y===2025)o.selected=true;s.appendChild(o);
+  });
+  const firstLoaded=Object.keys(GEOJSON_LULC).map(Number).find(y=>GEOJSON_LULC[y]!==null)||1985;
+  s.value=firstLoaded; lulcSwitchYear(firstLoaded);
+}
+function lulcStyle(f){return{fillColor:COLORS[extractClass(f.properties||{})],weight:.3,color:COLORS[extractClass(f.properties||{})],fillOpacity:.88};}
+function lulcSwitchYear(yr){
+  yr=+yr;
+  document.getElementById('lulc-chip-yr').innerHTML=`Epoch: <b>${yr}</b>`;
+  if(lGJLayer){lmap.removeLayer(lGJLayer);lGJLayer=null;}
+  const gj=GEOJSON_LULC[yr];
+  if(!gj){document.getElementById('lulc-chip-gj').innerHTML=`GeoJSON: <b>lulc_${yr}.geojson not found</b>`;return;}
+  lGJLayer=L.geoJSON(gj,{style:lulcStyle,
+    onEachFeature:(f,layer)=>{layer.bindPopup(`<strong>${extractLabel(f.properties||{})}</strong><br>Epoch: ${yr}`);}
+  }).addTo(lmap);
+  document.getElementById('lulc-chip-gj').innerHTML='GeoJSON: <b>loaded ✓</b>';
+  setTimeout(()=>{lmap.invalidateSize();const lb=lGJLayer.getBounds();if(isValidBounds(lb))lmap.fitBounds(lb,{padding:[40,40]});else lmap.setView([36.82,9.97],11);},100);
+}
+function setBase(key,btn){Object.values(lBases).forEach(l=>lmap.removeLayer(l));lBases[key].addTo(lmap);document.querySelectorAll('.tb').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
+function lulcFit(){if(lGJLayer&&isValidBounds(lGJLayer.getBounds()))lmap.fitBounds(lGJLayer.getBounds(),{padding:[40,40]});else lmap.setView([36.82,9.97],11);}
+function lulcClear(){if(lGJLayer){lmap.removeLayer(lGJLayer);lGJLayer=null;}document.getElementById('lulc-chip-gj').innerHTML='GeoJSON: <b>cleared</b>';}
+function isValidBounds(b){if(!b||!b.isValid())return false;const s=b.getSouthWest(),n=b.getNorthEast();return s.lng>7&&s.lng<12&&s.lat>30&&s.lat<38&&n.lng>7&&n.lng<12&&n.lat>30&&n.lat<38;}
+
+/* ════════════════════════════════════════════════════════════════
+   CHANGE DETECTION — reads class_1985, class_2025, transition
+   ════════════════════════════════════════════════════════════════ */
+let cdMap, cdBases={}, cdGJLayer=null, cdMode='global', cdChart=null;
+
+function bootCDMap(){
+  cdMap=L.map('cd-map',{zoomControl:false}).setView([36.82,9.97],11);
+  L.control.zoom({position:'bottomleft'}).addTo(cdMap);
+  cdBases.sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Esri',maxZoom:19});
+  cdBases.osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:19});
+  cdBases.sat.addTo(cdMap);
+  setTimeout(()=>{cdMap.invalidateSize();cdMap.setView([36.82,9.97],11);},150);
+  const from=document.getElementById('cd-from'),to=document.getElementById('cd-to');
+  YEARS.forEach(y=>{
+    const o1=document.createElement('option');o1.value=y;o1.textContent=y;from.appendChild(o1);
+    const o2=document.createElement('option');o2.value=y;o2.textContent=y;to.appendChild(o2);
+  });
+  from.value=1985; to.value=2025; to.selectedIndex=YEARS.length-1;
+  updateCD();
+}
+
+function setCDMode(mode){
+  cdMode=mode;
+  document.querySelectorAll('.cd-mb').forEach(b=>b.classList.remove('active'));
+  document.getElementById('cdm-'+mode).classList.add('active');
+  updateCD();
+}
+
+/* ── STYLING: the core fix ── */
+function cdStyle(f, mode){
+  const p = f.properties || {};
+  const c85 = p.class_1985;
+  const c25 = p.class_2025;
+
+  /* Global mode: color each transition uniquely */
+  if (mode === 'global') {
+    const trans = (c85||'?') + '→' + (c25||'?');
+    const color = TRANS_COLORS[trans] || '#9C9080';
+    return {fillColor:color, weight:.3, color:'rgba(255,255,255,.15)', fillOpacity:.85};
+  }
+
+  /* Per-class mode: determine gain/loss/stable from class codes */
+  const code = CLASS_KEY_INT[mode]; // e.g. urban→2, veg→3
+  if (c85 === code && c25 === code) {
+    // Stable: was this class, still this class
+    const cs = CD_COLORS_CLASS[mode] || CD_COLORS_CLASS.urban;
+    return {fillColor:cs.stable, weight:.5, color:'rgba(255,255,255,.3)', fillOpacity:.82};
+  }
+  if (c25 === code && c85 !== code) {
+    // Gain: was NOT this class, became this class
+    const cs = CD_COLORS_CLASS[mode] || CD_COLORS_CLASS.urban;
+    return {fillColor:cs.gain, weight:.5, color:'rgba(255,255,255,.3)', fillOpacity:.82};
+  }
+  if (c85 === code && c25 !== code) {
+    // Loss: was this class, became something else
+    const cs = CD_COLORS_CLASS[mode] || CD_COLORS_CLASS.urban;
+    return {fillColor:cs.loss, weight:.5, color:'rgba(255,255,255,.3)', fillOpacity:.82};
+  }
+  // Not relevant to this class — very faint
+  return {fillColor:'#E8E4DC', weight:.1, color:'transparent', fillOpacity:.08};
+}
+
+/* ── UPDATE CD MAP ── */
+function updateCD(){
+  const from = parseInt(document.getElementById('cd-from')?.value || 1985);
+  const to   = parseInt(document.getElementById('cd-to')?.value || 2025);
+  if(from >= to){ updateCDLegend(); return; }
+
+  if(cdGJLayer){ cdMap.removeLayer(cdGJLayer); cdGJLayer = null; }
+
+  /* Always use the global layer — cdStyle handles per-class filtering visually */
+  const gj = GEOJSON_CD['1985_2025']?.global;
+
+  if(gj){
+    cdGJLayer = L.geoJSON(gj, {
+      style: f => cdStyle(f, cdMode),
+      onEachFeature: (f, layer) => {
+        const p = f.properties || {};
+        const c85 = p.class_1985, c25 = p.class_2025;
+        const fromN = CLASS_INT_NAME[c85] || '?';
+        const toN   = CLASS_INT_NAME[c25] || '?';
+        if(cdMode === 'global'){
+          layer.bindPopup(`<strong>${fromN} → ${toN}</strong><br>1985: ${fromN} (class ${c85})<br>2025: ${toN} (class ${c25})`);
+        } else {
+          const code = CLASS_KEY_INT[cdMode];
+          let status = 'Other';
+          if(c85===code && c25===code) status='Stable';
+          else if(c25===code && c85!==code) status='Gain';
+          else if(c85===code && c25!==code) status='Loss';
+          layer.bindPopup(`<strong>${LABELS[cdMode]}: ${status}</strong><br>1985: ${fromN} (class ${c85})<br>2025: ${toN} (class ${c25})`);
+        }
+      }
+    }).addTo(cdMap);
+    setTimeout(()=>{
+      cdMap.invalidateSize();
+      const cb = cdGJLayer.getBounds();
+      if(isValidBounds(cb)) cdMap.fitBounds(cb, {padding:[30,30]});
+      else cdMap.setView([36.82,9.97],11);
+    },100);
+  }
+  updateCDLegend();
+  updateCDKpis(from, to);
+  updateCDChart(from, to);
+  updateCDAnalysis(from, to);
+}
+
+/* ── LEGEND ── */
+function updateCDLegend(){
+  const items = document.getElementById('cd-legend-items');
+  const gj = GEOJSON_CD['1985_2025']?.global;
+
+  if(cdMode === 'global'){
+    document.getElementById('cd-legend-title').textContent = 'Transitions 1985 → 2025';
+    if(!gj){ items.innerHTML = ''; return; }
+    /* Find which transitions actually exist in the data */
+    const present = new Set();
+    gj.features.forEach(f => {
+      const p = f.properties || {};
+      if(p.transition) present.add(p.transition);
+    });
+    const stable = [], changed = [];
+    present.forEach(t => { const [a,b] = t.split('→'); if(a===b) stable.push(t); else changed.push(t); });
+    /* Sort changed by destination class */
+    changed.sort((a,b) => { const [_,da]=a.split('→'), [__,db]=b.split('→'); return da-db; });
+
+    let html = '<div style="font-size:.56rem;color:var(--ink3);margin:4px 0 3px;font-weight:600;letter-spacing:1px">STABLE</div>';
+    stable.forEach(t => {
+      const n = CLASS_INT_NAME[t.split('→')[0]] || '?';
+      html += `<div class="lg-row"><div class="lg-sw" style="background:${TRANS_COLORS[t]||'#999'}"></div>${n}</div>`;
+    });
+    html += '<div style="font-size:.56rem;color:var(--ink3);margin:8px 0 3px;font-weight:600;letter-spacing:1px">CHANGED</div>';
+    changed.forEach(t => {
+      const [a,b] = t.split('→');
+      html += `<div class="lg-row"><div class="lg-sw" style="background:${TRANS_COLORS[t]||'#999'}"></div>${CLASS_INT_NAME[a]||'?'} → ${CLASS_INT_NAME[b]||'?'}</div>`;
+    });
+    items.innerHTML = html;
+  } else {
+    document.getElementById('cd-legend-title').textContent = (LABELS[cdMode]||'') + ' Change';
+    const cs = CD_COLORS_CLASS[cdMode] || CD_COLORS_CLASS.urban;
+    items.innerHTML = `
+      <div class="lg-row"><div class="lg-sw" style="background:${cs.gain}"></div>Gain</div>
+      <div class="lg-row"><div class="lg-sw" style="background:${cs.stable}"></div>Stable</div>
+      <div class="lg-row"><div class="lg-sw" style="background:${cs.loss}"></div>Loss</div>
+      <div class="lg-row"><div class="lg-sw" style="background:#E8E4DC;border:1px solid var(--border)"></div>Other</div>`;
+  }
+}
+
+/* ── KPIs ── */
+function updateCDKpis(from, to){
+  const d1=getData(from), d2=getData(to);
+  const box=document.getElementById('cd-kpis'); box.innerHTML='';
+  if(cdMode==='global'){
+    const netUrban=d2.urban-d1.urban, netVeg=d2.veg-d1.veg;
+    const totalGain=CLS.reduce((s,c)=>s+Math.max(0,d2[c]-d1[c]),0);
+    const totalLoss=CLS.reduce((s,c)=>s+Math.max(0,d1[c]-d2[c]),0);
+    [{l:'Urban Gain',v:'+'+netUrban.toFixed(1)+' km²',c:'gain'},
+     {l:'Veg Loss',v:'-'+Math.abs(netVeg).toFixed(1)+' km²',c:'loss'},
+     {l:'Total Gain',v:totalGain.toFixed(1)+' km²',c:'gain'},
+     {l:'Total Loss',v:totalLoss.toFixed(1)+' km²',c:'loss'}
+    ].forEach(k=>{
+      const d=document.createElement('div');d.className='cd-kpi';
+      d.innerHTML=`<div class="cd-kpi-label">${k.l}</div><div class="cd-kpi-val ${k.c}">${k.v}</div><div class="cd-kpi-sub">${from} → ${to}</div>`;
+      box.appendChild(d);
+    });
+  } else {
+    const c=cdMode, gain=Math.max(0,d2[c]-d1[c]), loss=Math.max(0,d1[c]-d2[c]), net=d2[c]-d1[c];
+    const pct=d1[c]?((net/d1[c])*100).toFixed(1):'0';
+    [{l:'Area '+from,v:d1[c].toFixed(1)+' km²',c:''},{l:'Area '+to,v:d2[c].toFixed(1)+' km²',c:''},
+     {l:'Net Change',v:(net>0?'+':'')+net.toFixed(1)+' km²',c:net>0?'gain':'loss'},
+     {l:'% Change',v:(net>0?'+':'')+pct+'%',c:net>0?'gain':'loss'}
+    ].forEach(k=>{
+      const d=document.createElement('div');d.className='cd-kpi';
+      d.innerHTML=`<div class="cd-kpi-label">${k.l}</div><div class="cd-kpi-val ${k.c}">${k.v}</div>`;
+      box.appendChild(d);
+    });
+  }
+}
+
+/* ── CHART ── */
+function updateCDChart(from, to){
+  const d1=getData(from), d2=getData(to), ctx=document.getElementById('c-cd');
+  if(cdChart){cdChart.destroy();cdChart=null;}
+  if(cdMode==='global'){
+    cdChart=new Chart(ctx,{type:'bar',
+      data:{labels:CLS.map(c=>LABELS[c]),
+        datasets:[
+          {label:String(from),data:CLS.map(c=>d1[c]),backgroundColor:CLS.map(c=>COLORS[c]+'88'),borderRadius:4},
+          {label:String(to),  data:CLS.map(c=>d2[c]),backgroundColor:CLS.map(c=>COLORS[c]),borderRadius:4},
+        ]},
+      options:{...BASE_OPT}});
+  } else {
+    const c=cdMode, snap=YEARS.filter(y=>y>=from&&y<=to);
+    cdChart=new Chart(ctx,{type:'line',
+      data:{labels:snap.map(String),
+        datasets:[{label:LABELS[c],data:snap.map(y=>getData(y)[c]),
+          borderColor:COLORS[c],backgroundColor:COLORS[c]+'22',fill:true,
+          tension:.45,borderWidth:2.5,pointRadius:4,pointBackgroundColor:COLORS[c]}]},
+      options:{...BASE_OPT,plugins:{legend:{display:false}}}});
+  }
+  document.getElementById('cd-chart-title').textContent=
+    cdMode==='global'?`Area by Class — ${from} vs ${to} (km²)`:`${LABELS[cdMode]||''} Trajectory ${from}–${to} (km²)`;
+}
+
+/* ── ANALYSIS TEXT ── */
+const CD_ANALYSIS={
+  global:{"1985_2025":{
+    title:"🔬 Four Decades of Structural Landscape Transformation",
+    body:`<p>Between 1985 and 2025, the Manouba governorate underwent a <strong>profound and largely irreversible restructuring</strong> of its land surface. The most conspicuous signal is the near-eightfold increase in urban surface from approximately 28 km² to 210 km², a trajectory closely correlated with the metropolitan expansion of Greater Tunis.</p>
+<p>Vegetation cover declined by <strong>130 km² (−70%)</strong>, a loss driven by the dual mechanism of direct conversion to sealed surfaces and indirect degradation through soil compaction and reduced recharge of shallow aquifers.</p>
+<p>Bare soil also declined (−46 km²), as built-up expansion consumed formerly exposed surfaces. Water bodies contracted by 6 km², reflecting both <em>hydrological regulation upstream</em> (Sidi Salem reservoir) and multi-year drought sequences.</p>
+<p>The aggregate net effect is a landscape that, by 2025, is significantly less permeable, less biologically productive, and more thermally charged — constituting a measurable <strong>urban heat island</strong> extension into the Manouba corridor.</p>`}},
+  urban:{default:{title:"🏙 Urban Expansion Dynamics",body:`<p>Urban surfaces expanded continuously across every inter-epoch interval, exhibiting <strong>no period of stagnation or reversal</strong>. Growth was concentrated in three spatial clusters: the eastern corridor bordering Tunis, the central zone around Manouba city, and the northwestern fringe adjacent to the Medjerda floodplain.</p><p>The acceleration is most pronounced in the <em>2000–2015 period</em>, coinciding with post-liberalization infrastructure investment and the proliferation of real estate subdivision schemes.</p>`}},
+  veg:{default:{title:"🌿 Vegetation Regression and Ecological Fragmentation",body:`<p>The loss of vegetation cover constitutes one of the most ecologically significant changes. Residual vegetation patches have become increasingly <strong>fragmented and spatially discontinuous</strong>, reducing their ecological functions as corridors for soil stabilization and biodiversity refugia.</p><p>Three processes drive vegetation decline: <em>direct conversion</em> to urban, <em>drought-induced degradation</em>, and <em>overgrazing pressure</em> on marginal lands.</p>`}},
+  water:{default:{title:"💧 Water Body Contraction",body:`<p>The contraction of surface water bodies reflects a compound signal involving both <strong>climatic and anthropogenic drivers</strong>. Permanent water bodies have been subject to upstream regulation since the commissioning of Sidi Salem dam.</p><p>Seasonal wetlands and agricultural irrigation ponds have largely disappeared, substituted by bare or urban surfaces.</p>`}},
+  bare:{default:{title:"🏜 Bare Soil Dynamics",body:`<p>Bare soil distribution exhibits a non-monotonic temporal signal: an initial expansion during 1985–2005 (reflecting vegetation loss without immediate urbanization), followed by a contraction as urban surfaces absorbed previously bare terrain.</p><p>The spatial distribution reveals a clear <em>periurban frontier dynamic</em>: an intermediate zone of cleared, degraded land precedes final sealing.</p>`}},
+};
+function updateCDAnalysis(from,to){
+  const key=`${from}_${to}`;
+  let a;
+  if(cdMode==='global') a=CD_ANALYSIS.global[key]||CD_ANALYSIS.global["1985_2025"]||{title:'🔬 Analysis',body:'<p>General trajectory shows progressive urban expansion at the expense of vegetation and agricultural land.</p>'};
+  else a=CD_ANALYSIS[cdMode]?.default||{title:'🔬 Class Analysis',body:'<p>Detailed analysis for this class.</p>'};
+  document.getElementById('cd-analysis-title').textContent=a.title;
+  document.getElementById('cd-analysis-body').innerHTML=a.body;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   PREDICTION MAP
+   ════════════════════════════════════════════════════════════════ */
+let predMap, predBases={}, predGJLayer=null, predYr=2030, predDonutC=null, predLineC=null;
+function bootPredMap(){
+  predMap=L.map('pred-map',{zoomControl:false}).setView([36.82,9.97],11);
+  L.control.zoom({position:'bottomleft'}).addTo(predMap);
+  predBases.sat=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{attribution:'Esri',maxZoom:19});
+  predBases.osm=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM',maxZoom:19});
+  predBases.sat.addTo(predMap);
+  setTimeout(()=>{predMap.invalidateSize();predMap.setView([36.82,9.97],11);},150);
+  buildPredCharts(); switchPred(2030);
+}
+function switchPred(yr){
+  predYr=yr;
+  document.querySelectorAll('.pred-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('pt-'+yr)?.classList.add('active');
+  if(predGJLayer){predMap.removeLayer(predGJLayer);predGJLayer=null;}
+  const gj=GEOJSON_PRED[yr];
+  if(gj){
+    predGJLayer=L.geoJSON(gj,{style:f=>{const cls=extractClass(f.properties||{});return{fillColor:COLORS[cls],weight:.3,color:COLORS[cls],fillOpacity:.88};},
+      onEachFeature:(f,layer)=>{layer.bindPopup(`<strong>${extractLabel(f.properties||{})}</strong><br>Projected: ${yr}`);}
+    }).addTo(predMap);
+    setTimeout(()=>{predMap.invalidateSize();const pb=predGJLayer.getBounds();if(isValidBounds(pb))predMap.fitBounds(pb,{padding:[30,30]});else predMap.setView([36.82,9.97],11);},100);
+  }
+  buildPredStats(yr); updatePredAnalysis(yr);
+  if(predDonutC){predDonutC.data.datasets[0].data=CLS.map(c=>getPredData(yr)[c]);predDonutC.update();}
+}
+function buildPredStats(yr){
+  const d=getPredData(yr),d25=getData(2025),tot=Object.values(d).reduce((a,b)=>a+b,0)||TOTAL;
+  const box=document.getElementById('pred-stats'); box.innerHTML='';
+  CLS.forEach(cls=>{
+    const v=d[cls],pct=((v/tot)*100).toFixed(1),chg=v-d25[cls],chgP=d25[cls]?((chg/d25[cls])*100).toFixed(1):'0';
+    const div=document.createElement('div'); div.className=`pred-stat ${cls}`;
+    div.innerHTML=`<div class="ps-lbl">${LABELS[cls]}</div><div class="ps-val">${typeof v==='number'?v.toFixed(1):v}</div>
+<div class="ps-sub">${pct}% · vs 2025</div><div class="ps-chg ${chg>=0?'up':'down'}">${chg>=0?'▲':'▼'} ${Math.abs(chgP)}%</div>`;
+    box.appendChild(div);
+  });
+}
+function buildPredCharts(){
+  predDonutC=new Chart(document.getElementById('c-pred-donut'),{type:'doughnut',
+    data:{labels:CLS.map(c=>LABELS[c]),datasets:[{data:CLS.map(c=>getPredData(2030)[c]),backgroundColor:CLS.map(c=>COLORS[c]),borderWidth:0,hoverOffset:6}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{position:'bottom',labels:{color:'#4A4235',font:{family:'Outfit',size:11},padding:8,boxWidth:10,boxHeight:10}}}}});
+  const allYears=[2025,...PRED_YEARS];
+  predLineC=new Chart(document.getElementById('c-pred-line'),{type:'line',
+    data:{labels:allYears.map(String),datasets:CLS.map(c=>({
+      label:LABELS[c],data:allYears.map(y=>y===2025?getData(2025)[c]:getPredData(y)[c]),
+      borderColor:COLORS[c],backgroundColor:COLORS[c]+'18',fill:true,tension:.4,borderWidth:2.5,
+      pointRadius:5,pointHoverRadius:8,pointBackgroundColor:COLORS[c],borderDash:allYears.map(y=>y>2025?[5,4]:[])}))},
+    options:{...BASE_OPT,interaction:{mode:'index',intersect:false}}});
+}
+const PRED_ANALYSIS={
+  2030:{title:"Scenario 2030 — Early Transition Phase",body:`<p>The 2030 projection captures the <strong>near-term continuation of observed trends</strong>, with urban surfaces expected to reach approximately 230 km². Vegetation cover is projected at 44 km², representing a critical threshold below which landscape connectivity becomes effectively severed.</p><p>Water bodies are projected to contract further to approximately 5 km².</p>`},
+  2035:{title:"Scenario 2035 — Accelerating Urban Consolidation",body:`<p>By 2035, the urban surface is projected to exceed <strong>248 km²</strong>. The urban fabric transitions from a periurban fringe condition to a <em>near-continuous metropolitan surface</em>.</p><p>Vegetation at 36 km² is largely confined to protected riparian buffers and remnant orchard plots.</p>`},
+  2040:{title:"Scenario 2040 — Near-Complete Urban Transformation",body:`<p>The 2040 projection represents the <strong>most structurally transformed state</strong>. Urban cover at 262 km² — over nine times the 1985 extent. Vegetation at 30 km² constitutes approximately <strong>9% of the study area</strong>.</p><p>Water surfaces at 4 km² represent only permanent elements. This trajectory underlines the urgency of evidence-based spatial planning.</p>`},
+};
+function updatePredAnalysis(yr){const a=PRED_ANALYSIS[yr]||{title:'Scenario Analysis',body:'<p>Select a prediction year.</p>'};document.getElementById('pred-analysis-yr').textContent=a.title;document.getElementById('pred-analysis-text').innerHTML=a.body;}
+
+/* ════════════════════════════════════════════════════════════════
+   FILE LOADING
+   ════════════════════════════════════════════════════════════════ */
+async function loadAllGeoJSONs(){
+  /* 1) LULC files */
+  await Promise.all(Object.keys(GEOJSON_LULC).map(Number).map(async yr=>{
+    try{
+      const r=await fetch('lulc_'+yr+'.geojson');
+      if(r.ok){GEOJSON_LULC[yr]=ensureWgs84(await r.json());console.log('✓ lulc_'+yr+'.geojson ('+GEOJSON_LULC[yr].features.length+')');}
+    }catch(e){}
+  }));
+
+  /* 2) CD file — single file, no splitting needed */
+  try{
+    const r=await fetch('cd_1985_2025.geojson');
+    if(r.ok){
+      const raw=await r.json();
+      const gj=ensureWgs84(raw);
+      GEOJSON_CD['1985_2025'].global=gj;
+      /* Log transition summary */
+      const present=new Set();
+      gj.features.forEach(f=>{const p=f.properties||{};if(p.transition)present.add(p.transition);});
+      console.log('✓ cd_1985_2025.geojson ('+gj.features.length+' features, '+present.size+' transitions)');
+      [...present].sort().forEach(t=>console.log('  '+t));
+    }
+  }catch(e){console.warn('cd_1985_2025.geojson not found',e);}
+    await Promise.all(PRED_YEARS.map(async yr=>{
+    try{const r=await fetch('pred_'+yr+'.geojson');if(r.ok){GEOJSON_PRED[yr]=ensureWgs84(await r.json());console.log('✓ pred_'+yr+'.geojson');}}catch(e){}
+  }));
+
+  /* 3) Refresh everything */
+  refreshStats(); rebuildCharts();
+  if(lulcMapBooted){
+    const sel=document.getElementById('lulc-yr-sel');
+    const first=Object.keys(GEOJSON_LULC).map(Number).find(y=>GEOJSON_LULC[y]!==null)||1985;
+    if(sel) sel.value=first; lulcSwitchYear(first);
+  }
+  if(cdMapBooted) updateCD();
+}
+
+/* ════════════════════════════════════════════════════════════════
+   INIT
+   ════════════════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded',()=>{
+  buildYearBar(); buildStatCards(); buildCharts();
+  /* Seed CD selectors (they'll be rebuilt on bootCDMap too, but seed for safety) */
+  const from=document.getElementById('cd-from'),to=document.getElementById('cd-to');
+  if(from&&to&&!from.children.length){
+    YEARS.forEach(y=>{const o1=document.createElement('option');o1.value=y;o1.textContent=y;from.appendChild(o1);
+    const o2=document.createElement('option');o2.value=y;o2.textContent=y;to.appendChild(o2);});
+    from.value=1985;to.value=2025;to.selectedIndex=YEARS.length-1;
+  }
+  loadAllGeoJSONs();
+});
+
+/* ════════════════════════════════════════════════════════════════
+   GENERATE PREDICTIONS FROM SERVER
+   ════════════════════════════════════════════════════════════════ */
+async function generatePredictions(){
+  const btn=document.getElementById('gen-pred-btn'),status=document.getElementById('gen-pred-status');
+  btn.disabled=true;btn.textContent='⏳ Generating…';status.textContent='Connecting to server…';
+  try{
+    const r=await Promise.race([fetch('http://localhost:5000/api/generate_predictions',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({years:[2030,2035,2040]})}),new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),60000))]);
+    if(!r.ok) throw new Error('Server error '+r.status);
+    const data=await r.json(); if(data.error) throw new Error(data.error);
+    let loaded=0;
+    [2030,2035,2040].forEach(yr=>{const gj=data.predictions&&data.predictions[String(yr)];if(gj){GEOJSON_PRED[yr]=ensureWgs84(gj);loaded++;}});
+    status.innerHTML=`<span style="color:var(--olive)">✓ ${loaded} maps ready</span>`;
+    btn.textContent='🔮 Regenerate Prediction Maps';btn.disabled=false;
+    if(predMapBooted) switchPred(predYr||2030);
+    if(window.predLineC) buildPredCharts();
+  }catch(e){
+    status.innerHTML=`<span style="color:#c94040">✗ ${e.message||'Server not running'}</span>`;
+    btn.textContent='🔮 Generate Prediction Maps (2030 · 2035 · 2040)';btn.disabled=false;
+  }
+}
+</script>
+</body>
+</html>

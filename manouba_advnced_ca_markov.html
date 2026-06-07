@@ -1,0 +1,1146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GeoAI Manouba — Land Simulator</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#07090D;--s1:#0B0F14;--s2:#111620;--s3:#171E2A;
+  --b1:rgba(255,255,255,.06);--b2:rgba(255,255,255,.11);--b3:rgba(255,255,255,.2);
+  --ink:#DDE4EE;--ink2:#7D8FA3;--ink3:#3D4D60;
+  --green:#2ECC71;--blue:#3B9EFF;--gold:#F0A500;--red:#E84040;--purple:#A78BFA;
+  --urban:#E05252;--veg:#2ECC71;--water:#3B9EFF;--bare:#D4A017;
+  --sh:0 4px 28px rgba(0,0,0,.65);--sh-lg:0 16px 56px rgba(0,0,0,.85);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Outfit',sans-serif;background:var(--bg);color:var(--ink)}
+
+/* ── MAP ── */
+#map{position:fixed;inset:0;z-index:0;background:#07090D}
+.leaflet-container{background:#07090D!important}
+.leaflet-control-zoom a{background:rgba(11,15,20,.96)!important;color:var(--ink)!important;border-color:var(--b2)!important;font-size:15px!important;width:30px!important;height:30px!important;line-height:30px!important}
+.leaflet-control-zoom a:hover{background:var(--s2)!important}
+.leaflet-control-attribution{background:rgba(7,9,13,.75)!important;color:var(--ink3)!important;font-size:.48rem!important}
+.leaflet-popup-content-wrapper{background:rgba(11,15,20,.98)!important;border:1px solid var(--b2)!important;border-radius:14px!important;box-shadow:var(--sh-lg)!important;color:var(--ink)!important}
+.leaflet-popup-tip{background:rgba(11,15,20,.98)!important}
+.leaflet-popup-content{margin:.75rem 1rem!important;font-family:'Outfit',sans-serif!important;font-size:.8rem!important;line-height:1.7}
+
+/* ── TOPBAR ── */
+#topbar{position:fixed;top:0;left:0;right:0;z-index:600;height:54px;
+  background:linear-gradient(90deg,rgba(7,9,13,.98),rgba(11,15,22,.98));
+  backdrop-filter:blur(24px);border-bottom:1px solid var(--b1);
+  display:flex;align-items:center;padding:0 1.25rem;gap:1rem}
+.tb-logo{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.tb-em{width:32px;height:32px;border-radius:9px;
+  background:linear-gradient(135deg,#1a6e35,#2ECC71);
+  display:flex;align-items:center;justify-content:center;font-size:.95rem;
+  box-shadow:0 0 14px rgba(46,204,113,.4)}
+.tb-title{font-family:'Cormorant Garamond',serif;font-size:1.05rem;font-weight:700;line-height:1}
+.tb-title span{color:var(--green)}
+.tb-sub{font-family:'JetBrains Mono',monospace;font-size:.5rem;color:var(--ink3);letter-spacing:2px;text-transform:uppercase;margin-top:2px}
+.tb-sep{width:1px;height:28px;background:var(--b1);flex-shrink:0}
+.tb-kpis{display:flex;gap:1.2rem}
+.tbk{text-align:center;min-width:52px}
+.tbk-v{font-family:'JetBrains Mono',monospace;font-size:.92rem;font-weight:600;line-height:1}
+.tbk-l{font-size:.5rem;color:var(--ink3);letter-spacing:1.2px;text-transform:uppercase;margin-top:2px}
+.tbk.g .tbk-v{color:var(--green)}.tbk.b .tbk-v{color:var(--blue)}.tbk.y .tbk-v{color:var(--gold)}
+.tb-views{display:flex;gap:4px;flex:1;justify-content:center}
+.tv{padding:5px 12px;border-radius:7px;background:transparent;border:1px solid var(--b2);
+  font-family:'Outfit',sans-serif;font-size:.72rem;font-weight:500;color:var(--ink2);
+  cursor:pointer;transition:all .14s;display:flex;align-items:center;gap:5px}
+.tv:hover{border-color:var(--b3);color:var(--ink);background:rgba(255,255,255,.04)}
+.tv.active{background:rgba(46,204,113,.1);border-color:rgba(46,204,113,.4);color:var(--green);font-weight:600}
+.tb-status{display:flex;align-items:center;gap:7px;padding:5px 13px;border-radius:100px;
+  border:1px solid var(--b2);font-family:'JetBrains Mono',monospace;font-size:.63rem;color:var(--ink2);flex-shrink:0}
+.tb-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite}
+
+/* ── PANEL BASE ── */
+.panel{position:fixed;top:54px;bottom:40px;z-index:500;
+  background:linear-gradient(180deg,rgba(7,9,13,.97),rgba(11,15,20,.97));
+  backdrop-filter:blur(24px);display:flex;flex-direction:column;
+  transition:transform .3s cubic-bezier(.4,0,.2,1)}
+.panel-scroll{overflow-y:auto;flex:1}
+.panel-scroll::-webkit-scrollbar{width:3px}
+.panel-scroll::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px}
+.ps{padding:.78rem .92rem;border-bottom:1px solid var(--b1)}
+.slbl{font-family:'JetBrains Mono',monospace;font-size:.54rem;letter-spacing:2.5px;text-transform:uppercase;color:var(--ink3);margin-bottom:.42rem}
+
+/* ── LEFT PANEL ── */
+#lp{left:0;width:252px;border-right:1px solid var(--b1)}
+#lp.off{transform:translateX(-252px)}
+.ptb{position:fixed;z-index:510;top:50%;transform:translateY(-50%);
+  width:15px;height:40px;background:rgba(11,15,20,.94);border:1px solid var(--b1);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.58rem;color:var(--ink3)}
+.ptb:hover{background:var(--s2);color:var(--ink)}
+#ptb-l{left:252px;border-radius:0 5px 5px 0}
+#ptb-r{right:0;border-radius:5px 0 0 5px}
+
+/* ── RIGHT PANEL ── */
+#rp{right:0;width:0;border-left:1px solid var(--b1);overflow:hidden}
+#rp.open{width:300px}
+
+/* ── PAGE SYSTEM inside right panel ── */
+.rp-pages{display:flex;flex-direction:column;width:300px;height:100%}
+.rp-nav{display:flex;gap:0;border-bottom:1px solid var(--b1);flex-shrink:0}
+.rp-nb{flex:1;padding:9px 4px;background:transparent;border:none;border-bottom:2px solid transparent;
+  font-family:'Outfit',sans-serif;font-size:.68rem;font-weight:500;color:var(--ink3);
+  cursor:pointer;transition:all .14s;text-align:center}
+.rp-nb:hover{color:var(--ink2);background:rgba(255,255,255,.03)}
+.rp-nb.active{color:var(--green);border-bottom-color:var(--green);font-weight:600;background:rgba(46,204,113,.05)}
+.rp-page{display:none;overflow-y:auto;flex:1}
+.rp-page.active{display:block}
+.rp-page::-webkit-scrollbar{width:3px}
+.rp-page::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px}
+
+/* ── DELEGATION LIST ── */
+.del-list{padding:.5rem}
+.dc{padding:.68rem .82rem;border-radius:10px;background:rgba(255,255,255,.02);
+  border:1px solid var(--b1);margin-bottom:4px;cursor:pointer;transition:all .14s}
+.dc:hover{background:rgba(255,255,255,.05);border-color:var(--b2)}
+.dc.active{border-color:rgba(46,204,113,.4);background:rgba(46,204,113,.06)}
+.dc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.dc-nm{display:flex;align-items:center;gap:7px;font-size:.79rem;font-weight:600;color:var(--ink)}
+.dc-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.dc-area{font-family:'JetBrains Mono',monospace;font-size:.56rem;color:var(--ink3)}
+.dc-bar{height:4px;border-radius:2px;overflow:hidden;display:flex;gap:1px}
+.dcb{height:100%;transition:width .5s}
+
+/* ── LULC CARDS ── */
+.lc-grid{display:grid;grid-template-columns:1fr 1fr;gap:.38rem}
+.lc{background:var(--s3);border:1px solid var(--b1);border-radius:9px;padding:.6rem;position:relative;overflow:hidden;transition:transform .13s,box-shadow .13s}
+.lc:hover{transform:translateY(-2px);box-shadow:var(--sh)}
+.lc::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.lc.urban::before{background:linear-gradient(90deg,var(--urban),transparent)}
+.lc.veg::before{background:linear-gradient(90deg,var(--veg),transparent)}
+.lc.water::before{background:linear-gradient(90deg,var(--water),transparent)}
+.lc.bare::before{background:linear-gradient(90deg,var(--bare),transparent)}
+.lc-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2px}
+.lc-ico{font-size:.82rem}
+.lc-bdg{font-family:'JetBrains Mono',monospace;font-size:.5rem;padding:2px 5px;border-radius:3px;font-weight:600}
+.lc-bdg.pos{background:rgba(46,204,113,.15);color:var(--green)}
+.lc-bdg.neg{background:rgba(232,64,64,.15);color:var(--red)}
+.lc-bdg.neu{background:rgba(125,143,163,.1);color:var(--ink3)}
+.lc-lbl{font-size:.56rem;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:var(--ink3);margin-bottom:2px}
+.lc-val{font-family:'JetBrains Mono',monospace;font-size:.9rem;font-weight:600;line-height:1}
+.lc.urban .lc-val{color:var(--urban)}.lc.veg .lc-val{color:var(--veg)}
+.lc.water .lc-val{color:var(--water)}.lc.bare .lc-val{color:var(--bare)}
+.lc-km{font-size:.56rem;color:var(--ink3);margin-top:1px}
+.lc-bar{height:3px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden;margin-top:.38rem}
+.lc-bf{height:100%;border-radius:2px;transition:width .7s cubic-bezier(.4,0,.2,1)}
+
+/* ── ENV RING ── */
+.env-row{display:flex;align-items:center;gap:.82rem}
+.env-ring{position:relative;width:76px;height:76px;flex-shrink:0}
+.env-ring canvas{position:absolute;inset:0}
+.env-inner{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.env-num{font-family:'JetBrains Mono',monospace;font-size:.92rem;font-weight:600;line-height:1}
+.env-lbl{font-size:.43rem;color:var(--ink3);letter-spacing:1px;text-transform:uppercase}
+.env-ms{flex:1;display:flex;flex-direction:column;gap:5px}
+.em{display:flex;align-items:center;gap:.4rem}
+.em-n{font-size:.6rem;color:var(--ink2);white-space:nowrap;width:62px}
+.em-bar{flex:1;height:3px;background:rgba(255,255,255,.05);border-radius:2px;overflow:hidden}
+.em-f{height:100%;border-radius:2px;transition:width .6s}
+.em-v{font-family:'JetBrains Mono',monospace;font-size:.52rem;color:var(--ink2);width:24px;text-align:right}
+
+/* ── DONUT ── */
+.dnut{height:130px;position:relative}
+
+/* ── INTERVENTIONS ── */
+.int-grid{display:grid;grid-template-columns:1fr 1fr;gap:.36rem}
+.ib{display:flex;flex-direction:column;align-items:center;gap:3px;
+  padding:.55rem .3rem;border-radius:10px;background:rgba(255,255,255,.02);
+  border:1px solid var(--b1);cursor:pointer;transition:all .14s}
+.ib:hover{background:rgba(255,255,255,.05);border-color:var(--b2);transform:translateY(-1px);box-shadow:var(--sh)}
+.ib.on{transform:translateY(-1px);box-shadow:var(--sh)}
+.ib.on.dam    {background:rgba(59,158,255,.1);border-color:rgba(59,158,255,.5)}
+.ib.on.agri   {background:rgba(46,204,113,.1);border-color:rgba(46,204,113,.5)}
+.ib.on.forest {background:rgba(30,150,70,.1);border-color:rgba(30,150,70,.5)}
+.ib.on.res    {background:rgba(232,64,64,.1);border-color:rgba(232,64,64,.5)}
+.ib.on.solar  {background:rgba(240,165,0,.1);border-color:rgba(240,165,0,.5)}
+.ib.on.ind    {background:rgba(167,139,250,.1);border-color:rgba(167,139,250,.5)}
+.ib-ico{font-size:1.3rem}
+.ib-nm{font-size:.63rem;font-weight:600;color:var(--ink)}
+.ib-ds{font-size:.53rem;color:var(--ink3);text-align:center;line-height:1.3}
+.ib-fx{font-family:'JetBrains Mono',monospace;font-size:.53rem;margin-top:2px}
+.ib.dam   .ib-fx{color:var(--blue)}.ib.agri  .ib-fx{color:var(--green)}
+.ib.forest.ib-fx{color:#1e9646}.ib.res    .ib-fx{color:var(--red)}
+.ib.solar .ib-fx{color:var(--gold)}.ib.ind .ib-fx{color:var(--purple)}
+.ch{font-size:.68rem;color:var(--green);text-align:center;padding:.4rem;
+  background:rgba(46,204,113,.07);border:1px solid rgba(46,204,113,.2);border-radius:7px;
+  margin-top:.38rem;animation:glow 1.5s ease-in-out infinite;display:none}
+.apply-btn{width:100%;padding:9px;border-radius:9px;background:linear-gradient(135deg,#1a6e35,#2ECC71);border:none;
+  font-family:'Outfit',sans-serif;font-size:.81rem;font-weight:700;color:#06120A;
+  cursor:pointer;transition:all .14s;display:flex;align-items:center;justify-content:center;gap:6px;margin-top:.38rem;
+  box-shadow:0 4px 18px rgba(46,204,113,.25)}
+.apply-btn:hover:not(:disabled){filter:brightness(1.1);transform:translateY(-1px);box-shadow:0 6px 24px rgba(46,204,113,.4)}
+.apply-btn:disabled{opacity:.3;cursor:not-allowed;box-shadow:none}
+.reset-btn{width:100%;padding:7px;border-radius:9px;background:transparent;
+  border:1px solid var(--b1);font-family:'Outfit',sans-serif;font-size:.73rem;
+  color:var(--ink3);cursor:pointer;transition:all .14s;margin-top:.32rem}
+.reset-btn:hover{border-color:var(--red);color:var(--red)}
+
+/* ═══════════════════════════════════════════════════
+   PREDICTION PAGE — full panel makeover
+═══════════════════════════════════════════════════ */
+.pred-trigger{margin:.78rem .92rem}
+.pred-run-btn{width:100%;padding:11px;border-radius:10px;
+  background:linear-gradient(135deg,#1a3a6e,#3B9EFF);border:none;
+  font-family:'Outfit',sans-serif;font-size:.84rem;font-weight:700;color:#fff;
+  cursor:pointer;transition:all .14s;display:flex;align-items:center;justify-content:center;gap:7px;
+  box-shadow:0 4px 20px rgba(59,158,255,.3)}
+.pred-run-btn:hover:not(:disabled){filter:brightness(1.1);transform:translateY(-1px);box-shadow:0 6px 28px rgba(59,158,255,.45)}
+.pred-run-btn:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
+
+/* Prediction scenario year tabs */
+.pred-tabs{display:flex;gap:5px;padding:.5rem .92rem 0;flex-shrink:0}
+.pred-tab{flex:1;padding:7px 4px;border-radius:8px;background:rgba(255,255,255,.03);
+  border:1px solid var(--b1);font-family:'JetBrains Mono',monospace;font-size:.7rem;
+  font-weight:600;color:var(--ink3);cursor:pointer;transition:all .14s;text-align:center}
+.pred-tab:hover{border-color:var(--b2);color:var(--ink2)}
+.pred-tab.active{background:rgba(59,158,255,.12);border-color:rgba(59,158,255,.45);color:var(--blue)}
+
+/* Big prediction year display */
+.pred-year-hero{padding:.7rem .92rem .4rem;display:flex;align-items:baseline;gap:.6rem}
+.pred-year-num{font-family:'Cormorant Garamond',serif;font-size:2.8rem;font-weight:700;color:var(--blue);line-height:1}
+.pred-year-lbl{font-size:.7rem;color:var(--ink2);font-weight:300}
+.pred-src{font-family:'JetBrains Mono',monospace;font-size:.55rem;padding:2px 7px;border-radius:4px;font-weight:600;margin-left:auto;align-self:center}
+.pred-src.py{background:rgba(46,204,113,.15);color:var(--green)}
+.pred-src.js{background:rgba(59,158,255,.15);color:var(--blue)}
+
+/* Prediction class overview cards */
+.pred-cards{display:grid;grid-template-columns:1fr 1fr;gap:.38rem;padding:0 .92rem .6rem}
+.pc-card{border-radius:10px;padding:.65rem .7rem;position:relative;overflow:hidden}
+.pc-card.urban{background:linear-gradient(135deg,rgba(224,82,82,.15),rgba(224,82,82,.05));border:1px solid rgba(224,82,82,.25)}
+.pc-card.veg  {background:linear-gradient(135deg,rgba(46,204,113,.15),rgba(46,204,113,.05));border:1px solid rgba(46,204,113,.25)}
+.pc-card.water{background:linear-gradient(135deg,rgba(59,158,255,.15),rgba(59,158,255,.05));border:1px solid rgba(59,158,255,.25)}
+.pc-card.bare {background:linear-gradient(135deg,rgba(212,160,23,.15),rgba(212,160,23,.05));border:1px solid rgba(212,160,23,.25)}
+.pcc-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:4px}
+.pcc-ico{font-size:.9rem}
+.pcc-delta{font-family:'JetBrains Mono',monospace;font-size:.55rem;padding:2px 6px;border-radius:4px;font-weight:700}
+.pcc-delta.pos{background:rgba(46,204,113,.2);color:var(--green)}
+.pcc-delta.neg{background:rgba(232,64,64,.2);color:var(--red)}
+.pcc-delta.neu{background:rgba(125,143,163,.1);color:var(--ink3)}
+.pcc-lbl{font-size:.56rem;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:var(--ink3);margin-bottom:2px}
+.pcc-val{font-family:'JetBrains Mono',monospace;font-size:1.05rem;font-weight:600;line-height:1}
+.pc-card.urban .pcc-val{color:var(--urban)}
+.pc-card.veg   .pcc-val{color:var(--veg)}
+.pc-card.water .pcc-val{color:var(--water)}
+.pc-card.bare  .pcc-val{color:var(--bare)}
+.pcc-km{font-size:.56rem;color:var(--ink3);margin-top:1px}
+.pcc-prog{height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-top:.4rem}
+.pcc-prog-f{height:100%;border-radius:2px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+
+/* Trajectory chart */
+.traj-wrap{padding:0 .92rem .6rem}
+.traj-title{font-family:'JetBrains Mono',monospace;font-size:.54rem;letter-spacing:2px;text-transform:uppercase;color:var(--ink3);margin-bottom:.55rem}
+.traj-chart{height:140px;position:relative}
+
+/* Scenario comparison bar */
+.comp-wrap{padding:0 .92rem .6rem}
+.comp-title{font-family:'JetBrains Mono',monospace;font-size:.54rem;letter-spacing:2px;text-transform:uppercase;color:var(--ink3);margin-bottom:.55rem}
+.comp-row{display:flex;align-items:center;gap:.5rem;margin-bottom:.45rem}
+.comp-lbl{display:flex;align-items:center;gap:5px;font-size:.64rem;color:var(--ink2);width:70px;flex-shrink:0}
+.comp-dot{width:7px;height:7px;border-radius:2px;flex-shrink:0}
+.comp-bars{flex:1;display:flex;flex-direction:column;gap:2px}
+.comp-bar-row{display:flex;align-items:center;gap:4px}
+.comp-bar-year{font-family:'JetBrains Mono',monospace;font-size:.48rem;color:var(--ink3);width:24px;flex-shrink:0}
+.comp-bar-bg{flex:1;height:6px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden}
+.comp-bar-fill{height:100%;border-radius:3px;transition:width .8s cubic-bezier(.4,0,.2,1)}
+.comp-bar-val{font-family:'JetBrains Mono',monospace;font-size:.5rem;color:var(--ink3);width:28px;text-align:right;flex-shrink:0}
+
+/* AI Insight panel */
+.insight-wrap{padding:0 .92rem .8rem}
+.insight-box{background:linear-gradient(135deg,rgba(59,158,255,.08),rgba(46,204,113,.05));
+  border:1px solid rgba(59,158,255,.18);border-radius:12px;padding:.75rem .85rem}
+.insight-header{display:flex;align-items:center;gap:7px;margin-bottom:.5rem}
+.insight-icon{width:26px;height:26px;border-radius:7px;background:rgba(59,158,255,.15);
+  display:flex;align-items:center;justify-content:center;font-size:.85rem;flex-shrink:0}
+.insight-title{font-size:.72rem;font-weight:600;color:var(--blue)}
+.insight-src{font-family:'JetBrains Mono',monospace;font-size:.5rem;color:var(--ink3);margin-top:1px}
+.insight-text{font-size:.7rem;color:var(--ink2);line-height:1.65;font-weight:300}
+.insight-text b{color:var(--ink);font-weight:600}
+.insight-metrics{display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-top:.6rem}
+.im{background:rgba(255,255,255,.04);border:1px solid var(--b1);border-radius:7px;padding:.45rem .55rem;text-align:center}
+.im-v{font-family:'JetBrains Mono',monospace;font-size:.82rem;font-weight:600;line-height:1}
+.im-l{font-size:.52rem;color:var(--ink3);margin-top:2px}
+.im.pos .im-v{color:var(--green)}.im.neg .im-v{color:var(--red)}.im.neu .im-v{color:var(--blue)}
+
+/* ── LOG ── */
+.log-wrap{display:flex;flex-direction:column;gap:3px;max-height:140px;overflow-y:auto}
+.log-wrap::-webkit-scrollbar{width:2px}
+.li{display:flex;gap:7px;padding:5px 7px;border-radius:7px;background:rgba(255,255,255,.03);border:1px solid var(--b1);font-size:.64rem;animation:slideIn .22s ease}
+.li-ico{flex-shrink:0;font-size:.8rem}
+.li-t{color:var(--ink2);line-height:1.4}.li-t b{color:var(--ink)}
+.log-empty{font-size:.66rem;color:var(--ink3);text-align:center;padding:.6rem 0;font-style:italic}
+
+/* ── BOTTOM BAR ── */
+#bot{position:fixed;bottom:0;left:252px;right:0;z-index:500;height:40px;
+  background:rgba(7,9,13,.94);backdrop-filter:blur(16px);border-top:1px solid var(--b1);
+  display:flex;align-items:center;justify-content:center;gap:1.75rem;
+  font-family:'JetBrains Mono',monospace;font-size:.58rem;color:var(--ink3)}
+#bot.rp-open{right:300px}
+.bi{display:flex;align-items:center;gap:4px}
+.bsw{width:8px;height:8px;border-radius:2px}
+
+/* ── WALK HUD ── */
+#walk-hud{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);z-index:700;
+  background:rgba(7,9,13,.96);border:1px solid var(--b2);border-radius:11px;
+  padding:.5rem 1.15rem;font-family:'JetBrains Mono',monospace;font-size:.7rem;color:var(--ink2);
+  display:none;text-align:center;line-height:1.7;box-shadow:var(--sh-lg)}
+
+/* ── TOOLTIP ── */
+#tt{position:fixed;z-index:700;pointer-events:none;background:rgba(7,9,13,.98);
+  backdrop-filter:blur(14px);border:1px solid var(--b2);border-radius:11px;
+  padding:.65rem .85rem;max-width:200px;display:none;box-shadow:var(--sh-lg)}
+.tt-n{font-weight:700;color:var(--ink);font-size:.79rem;margin-bottom:.25rem}
+.tt-r{display:flex;justify-content:space-between;font-size:.63rem;margin-bottom:2px}
+.tt-l{color:var(--ink3)}.tt-v{font-family:'JetBrains Mono',monospace;color:var(--ink2)}
+
+/* ── NOTIF ── */
+#notif{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:800;
+  background:linear-gradient(135deg,rgba(11,15,20,.98),rgba(17,22,32,.98));
+  border:1px solid rgba(46,204,113,.35);border-radius:11px;padding:.5rem 1.3rem;
+  font-size:.77rem;font-weight:500;color:var(--ink);box-shadow:var(--sh-lg);
+  display:none;white-space:nowrap;animation:slideDown .22s ease}
+
+/* ── OBJECT POPUP ── */
+#opop{position:fixed;z-index:700;background:rgba(7,9,13,.98);backdrop-filter:blur(18px);
+  border:1px solid var(--b2);border-radius:13px;padding:.78rem .92rem;width:208px;display:none;box-shadow:var(--sh-lg)}
+.op-t{font-weight:700;font-size:.8rem;color:var(--ink);margin-bottom:.22rem}
+.op-d{font-size:.67rem;color:var(--ink2);line-height:1.5;margin-bottom:.45rem;font-weight:300}
+.op-r{display:flex;justify-content:space-between;font-size:.63rem;margin-bottom:2px}
+.op-l{color:var(--ink3)}.op-v{font-family:'JetBrains Mono',monospace}
+.op-v.pos{color:var(--green)}.op-v.neg{color:var(--red)}
+
+/* ── CUSTOM MARKER ── */
+.iv-marker{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.1rem;border:2.5px solid rgba(255,255,255,.5);box-shadow:0 3px 16px rgba(0,0,0,.65);cursor:pointer;transition:transform .15s}
+.iv-marker:hover{transform:scale(1.18)}
+
+/* ── OPEN PANEL BTN ── */
+#open-rp-btn{position:fixed;top:50%;right:0;transform:translateY(-50%);z-index:510;
+  width:22px;height:52px;background:linear-gradient(135deg,rgba(11,15,20,.96),rgba(17,22,32,.96));
+  border:1px solid var(--b2);border-radius:6px 0 0 6px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:.65rem;color:var(--ink2);transition:all .14s}
+#open-rp-btn:hover{color:var(--green);border-color:rgba(46,204,113,.4);background:rgba(46,204,113,.08)}
+
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes glow{0%,100%{box-shadow:none}50%{box-shadow:0 0 12px rgba(46,204,113,.2)}}
+@keyframes slideIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+@keyframes slideDown{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translate(-50%,0)}}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div id="topbar">
+  <div class="tb-logo">
+    <div class="tb-em">🌿</div>
+    <div><div class="tb-title"><span>GeoAI</span> Manouba</div><div class="tb-sub">Land Use Simulator · Hackathon</div></div>
+  </div>
+  <div class="tb-sep"></div>
+  <div class="tb-kpis">
+    <div class="tbk g"><div class="tbk-v" id="ts-env">—</div><div class="tbk-l">Env Score</div></div>
+    <div class="tbk b"><div class="tbk-v" id="ts-veg">—</div><div class="tbk-l">Vegetation</div></div>
+    <div class="tbk y"><div class="tbk-v" id="ts-act">0</div><div class="tbk-l">Actions</div></div>
+  </div>
+  <div class="tb-sep"></div>
+  <div class="tb-views">
+    <button class="tv active" id="m-sat"    onclick="setLayer('sat')">🛰 Satellite</button>
+    <button class="tv"        id="m-street" onclick="setLayer('street')">🗺 Street</button>
+    <button class="tv"        id="m-topo"   onclick="setLayer('topo')">⛰ Topo</button>
+    <button class="tv"        id="m-walk"   onclick="toggleWalk()">🚶 Walk Mode</button>
+  </div>
+  <div class="tb-status"><div class="tb-dot"></div><span id="tb-st">Select a delegation</span></div>
+</div>
+
+<!-- LEFT PANEL — Delegations -->
+<div class="panel" id="lp">
+  <div class="ps"><div class="slbl">Manouba Delegations</div>
+    <div style="font-size:.69rem;color:var(--ink2);line-height:1.5;font-weight:300">Click a delegation on the map or in this list to explore it.</div>
+  </div>
+  <div class="panel-scroll"><div class="del-list" id="del-list"></div></div>
+</div>
+<button class="ptb" id="ptb-l" onclick="togL()">◀</button>
+
+<!-- RIGHT PANEL — tabbed -->
+<div class="panel" id="rp">
+  <div class="rp-pages">
+    <div class="rp-nav">
+      <button class="rp-nb active" id="rn-info"  onclick="rpTab('info')">📍 Info</button>
+      <button class="rp-nb"        id="rn-build" onclick="rpTab('build')">🏗 Build</button>
+      <button class="rp-nb"        id="rn-pred"  onclick="rpTab('pred')">🔮 Predict</button>
+      <button class="rp-nb"        id="rn-log"   onclick="rpTab('log')">📋 Log</button>
+    </div>
+
+    <!-- INFO TAB -->
+    <div class="rp-page active" id="rt-info">
+      <div class="ps">
+        <div class="slbl">Selected Delegation</div>
+        <div style="font-family:'Cormorant Garamond',serif;font-size:1.1rem;font-weight:700;color:var(--ink);line-height:1.1" id="rp-nm">— None selected —</div>
+        <div style="font-size:.69rem;color:var(--ink2);margin-top:.22rem;line-height:1.5;font-weight:300" id="rp-sb">Click a delegation on the map to begin</div>
+      </div>
+      <div class="ps"><div class="slbl">LULC Classification · 2025</div>
+        <div class="lc-grid" id="lc-grid">
+          <div style="grid-column:1/-1;font-size:.67rem;color:var(--ink3);padding:.2rem 0">Select a delegation to view LULC.</div>
+        </div>
+      </div>
+      <div class="ps"><div class="slbl">Environmental Health Index</div>
+        <div class="env-row">
+          <div class="env-ring"><canvas id="ec" width="76" height="76"></canvas>
+            <div class="env-inner"><div class="env-num" id="en">—</div><div class="env-lbl">/100</div></div>
+          </div>
+          <div class="env-ms">
+            <div class="em"><span class="em-n">🌿 Greenness</span><div class="em-bar"><div class="em-f" id="ef-v" style="background:var(--veg);width:0%"></div></div><span class="em-v" id="ev-v">—</span></div>
+            <div class="em"><span class="em-n">💧 Water</span>    <div class="em-bar"><div class="em-f" id="ef-w" style="background:var(--water);width:0%"></div></div><span class="em-v" id="ev-w">—</span></div>
+            <div class="em"><span class="em-n">🏙 Urban</span>    <div class="em-bar"><div class="em-f" id="ef-u" style="background:var(--urban);width:0%"></div></div><span class="em-v" id="ev-u">—</span></div>
+            <div class="em"><span class="em-n">🏜 Bare</span>     <div class="em-bar"><div class="em-f" id="ef-b" style="background:var(--bare);width:0%"></div></div><span class="em-v" id="ev-b">—</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="ps"><div class="slbl">Current Composition</div><div class="dnut"><canvas id="dnut"></canvas></div></div>
+    </div>
+
+    <!-- BUILD TAB -->
+    <div class="rp-page" id="rt-build">
+      <div class="ps"><div class="slbl">Select Intervention · Then Click Map</div>
+        <div class="int-grid">
+          <button class="ib dam"    onclick="selIv('dam',this)">   <div class="ib-ico">🏞</div><div class="ib-nm">Dam</div>         <div class="ib-ds">Water reservoir</div><div class="ib-fx">💧+Water +Agri</div></button>
+          <button class="ib agri"   onclick="selIv('agri',this)">  <div class="ib-ico">🌾</div><div class="ib-nm">Agriculture</div> <div class="ib-ds">Managed cropland</div><div class="ib-fx">🌿+Veg −Bare</div></button>
+          <button class="ib forest" onclick="selIv('forest',this)"><div class="ib-ico">🌳</div><div class="ib-nm">Reforest</div>    <div class="ib-ds">Restore canopy</div>  <div class="ib-fx">🌿++Veg −CO₂</div></button>
+          <button class="ib res"    onclick="selIv('res',this)">   <div class="ib-ico">🏘</div><div class="ib-nm">Residential</div> <div class="ib-ds">Housing zone</div>     <div class="ib-fx">🏙+Urban −Veg</div></button>
+          <button class="ib solar"  onclick="selIv('solar',this)"> <div class="ib-ico">☀</div> <div class="ib-nm">Solar Farm</div>  <div class="ib-ds">Renewable energy</div> <div class="ib-fx">⚡−Bare +Clean</div></button>
+          <button class="ib ind"    onclick="selIv('ind',this)">   <div class="ib-ico">🏭</div><div class="ib-nm">Industrial</div>  <div class="ib-ds">Factory/logistics</div><div class="ib-fx">🏗+Urban −−Veg</div></button>
+        </div>
+        <div class="ch" id="ch">🖱 Click anywhere on the map to place</div>
+        <button class="apply-btn" id="ab" onclick="applyWhole()" disabled>⚡ Apply to Whole Delegation</button>
+        <button class="reset-btn"         onclick="resetDel()">↺ Reset to Baseline</button>
+      </div>
+    </div>
+
+    <!-- PREDICT TAB -->
+    <div class="rp-page" id="rt-pred">
+      <div class="pred-trigger">
+        <button class="pred-run-btn" id="pb" onclick="runPred()" disabled>
+          🔮 Run Markov Prediction (2025→2035)
+        </button>
+      </div>
+
+      <!-- Year tabs -->
+      <div class="pred-tabs" id="pred-tabs" style="display:none">
+        <button class="pred-tab active" id="pt-2030" onclick="showPredYear(2030)">2030</button>
+        <button class="pred-tab"        id="pt-2033" onclick="showPredYear(2033)">2033</button>
+        <button class="pred-tab"        id="pt-2035" onclick="showPredYear(2035)">2035</button>
+      </div>
+
+      <!-- Hero year + class cards -->
+      <div id="pred-content" style="display:none">
+        <div class="pred-year-hero">
+          <div class="pred-year-num" id="pyear">2035</div>
+          <div class="pred-year-lbl">Projected LULC<br>vs 2025 baseline</div>
+          <div class="pred-src" id="psrc"></div>
+        </div>
+        <div class="pred-cards" id="pred-cards"></div>
+
+        <!-- Trajectory chart -->
+        <div class="traj-wrap">
+          <div class="traj-title">Annual Trajectory 2025 → 2035</div>
+          <div class="traj-chart"><canvas id="traj-chart"></canvas></div>
+        </div>
+
+        <!-- Comparison bars -->
+        <div class="comp-wrap">
+          <div class="comp-title">Baseline vs Predicted (% area)</div>
+          <div id="comp-rows"></div>
+        </div>
+
+        <!-- AI Insight -->
+        <div class="insight-wrap">
+          <div class="insight-box">
+            <div class="insight-header">
+              <div class="insight-icon">🧠</div>
+              <div><div class="insight-title">AI Scenario Analysis</div><div class="insight-src" id="isrc"></div></div>
+            </div>
+            <div class="insight-text" id="insight-text"></div>
+            <div class="insight-metrics" id="insight-metrics"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOG TAB -->
+    <div class="rp-page" id="rt-log">
+      <div class="ps"><div class="slbl">Action Log</div>
+        <div class="log-wrap" id="log"><div class="log-empty">No actions yet. Select a delegation and start building.</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- open right panel button when closed -->
+<button id="open-rp-btn" onclick="openRp()">◀</button>
+
+<!-- BOTTOM BAR -->
+<div id="bot">
+  <div class="bi"><div class="bsw" style="background:var(--urban)"></div>Urban</div>
+  <div class="bi"><div class="bsw" style="background:var(--veg)"></div>Vegetation</div>
+  <div class="bi"><div class="bsw" style="background:var(--water)"></div>Water</div>
+  <div class="bi"><div class="bsw" style="background:var(--bare)"></div>Bare Soil</div>
+  <span style="font-size:.56rem">· Click delegation · Scroll = zoom · Drag = pan · Walk mode = arrow keys ·</span>
+</div>
+
+<div id="walk-hud">🚶 Walk Mode &nbsp;·&nbsp; Arrow keys / WASD to move &nbsp;·&nbsp;
+  <button onclick="toggleWalk()" style="background:var(--red);border:none;color:#fff;padding:2px 9px;border-radius:5px;cursor:pointer;font-size:.64rem;font-weight:600">✕ Exit</button>
+</div>
+<div id="tt"></div>
+<div id="notif"></div>
+<div id="opop"></div>
+<div id="map"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   EMBEDDED REAL GEOJSON
+═══════════════════════════════════════════════════════ */
+const GJ = {"type":"FeatureCollection","name":"manouba_delegations_geojson","crs":{"type":"name","properties":{"name":"urn:ogc:def:crs:OGC:1.3:CRS84"}},"features":[{"type":"Feature","properties":{"GID_2":"TUN.13.1_1","GID_0":"TUN","COUNTRY":"Tunisia","GID_1":"TUN.13_1","NAME_1":"Manubah","NL_NAME_1":"NA","NAME_2":"Borj El Amri","VARNAME_2":"NA","NL_NAME_2":"NA","TYPE_2":"Delegation","ENGTYPE_2":"Delegation","CC_2":"NA","HASC_2":"TN.MN.BA"},"geometry":{"type":"MultiPolygon","coordinates":[[[[9.808629035000072,36.64121246300012],[9.80530738900004,36.64693069600012],[9.803902626000072,36.64912796100011],[9.799509047999988,36.65599823100022],[9.787579536000058,36.66276168800019],[9.779885293,36.66992187600012],[9.774737357000019,36.676761627],[9.77106952700012,36.683959960999985],[9.763987541,36.693710328000094],[9.759618759000011,36.70832824799997],[9.756561280000076,36.71847915600009],[9.758090019,36.728332520000194],[9.758572578999958,36.731449127000225],[9.75875186999996,36.73246383700016],[9.75983428900008,36.738601684000145],[9.760800361000166,36.74407959100015],[9.758857728000104,36.74768066500003],[9.753764152000189,36.74760818600008],[9.745717049000147,36.74509048600013],[9.7400207530001,36.741050721],[9.736800194,36.73850250200011],[9.736247063000148,36.738861084000206],[9.734707830999978,36.74033737300014],[9.734339713999985,36.74093246600008],[9.734228134000078,36.741683961],[9.734360695000122,36.742454530000074],[9.734520912000145,36.74282455500005],[9.735003472000015,36.74341964700008],[9.736820220000054,36.744918822999956],[9.73803424900005,36.74567031800005],[9.739163400000129,36.746555329],[9.74161720300003,36.74794769200001],[9.74430465600008,36.749916077000165],[9.745786668000134,36.751605988],[9.746943474000192,36.752452851],[9.747968673000107,36.75337219400022],[9.749146461000036,36.75415420500018],[9.750171660999952,36.755081175999955],[9.751331330000069,36.755947114000016],[9.754781722000095,36.76007461500002],[9.755932808000123,36.760948181000096],[9.75694274800002,36.76189041099998],[9.758095742000117,36.762680055000125],[9.759102822000044,36.76358795200011],[9.761453629000128,36.765155793000154],[9.762396813,36.76547622600011],[9.764025688000045,36.76569366399998],[9.765776634000234,36.76575851400011],[9.786421777000099,36.76588440000013],[9.78819561000005,36.7659301770001],[9.789877891000154,36.76607894900015],[9.790890694000199,36.76631927500014],[9.791669845000095,36.766708374000096],[9.793655396000068,36.76811599700012],[9.794630051000153,36.769050598000184],[9.796870232000144,36.77065277100005],[9.797299384000125,36.770820619000084],[9.798232078000114,36.770984649000155],[9.799171447000033,36.77094650200011],[9.800010681000105,36.7706909180001],[9.801965713000127,36.76913833700016],[9.802774427999983,36.76822662500004],[9.804508209,36.76686477600007],[9.805220603000143,36.76649093600005],[9.805692673000122,36.76636505200011],[9.80730247500018,36.76618576200011],[9.809064865000073,36.76615524300016],[9.815199853,36.766242982000136],[9.817582130000025,36.76633834900012],[9.818700790000035,36.7664604190001],[9.81972408300006,36.76668167200002],[9.820176124000158,36.7668533330001],[9.821820258000036,36.76773071400013],[9.823587418000146,36.76824951100016],[9.82441616000015,36.76856231800011],[9.825336456,36.76910400400007],[9.826070785000097,36.76943206900022],[9.826971054000067,36.769649506000086],[9.829380990000159,36.77001190099996],[9.83027839700007,36.77022171100018],[9.830679893000072,36.770362855000045],[9.831974984000025,36.77103424100009],[9.832427025000035,36.77119064400015],[9.833990096000134,36.771457671000036],[9.83860874200001,36.771682739],[9.84022712799998,36.771888734000086],[9.841156007000096,36.772163392000074],[9.84243488400004,36.77284240800012],[9.842867851999982,36.77300262400006],[9.843850136000166,36.773223877000156],[9.844926834000079,36.773349762000095],[9.846632003000122,36.77344131400012],[9.850117684000137,36.77339553900006],[9.851792335000054,36.77318573000011],[9.852775574000228,36.772914887],[9.853646278999973,36.77257537899997],[9.854489327000094,36.77224731600009],[9.855476379999962,36.77202224800012],[9.857692719000111,36.77185440000009],[9.87256908400006,36.77201843300007],[9.874254228000135,36.772132873000125],[9.875291824000099,36.77229690600011],[9.876198769000089,36.772579194000016],[9.877455710000083,36.773258210000066],[9.877888680000114,36.773418426],[9.879407882000224,36.773704529000135],[9.88226890600007,36.77385711600006],[9.890662194000155,36.77394867],[9.892432212000058,36.773914337000086],[9.894145965000101,36.773769379000086],[9.895218850000143,36.773548126999984],[9.8971033090001,36.772850037000225],[9.898084640000027,36.77258300900016],[9.89911079500011,36.77244949300003],[9.900155067,36.772415161000126],[9.901675225000018,36.772529602],[9.902593613000066,36.77274322600009],[9.902998925000118,36.772903442000114],[9.904540062,36.773803711],[9.905693054,36.774173736000236],[9.906860351000136,36.774410247000084],[9.9076671610001,36.774421693000235],[9.911610602999977,36.774219513000205],[9.912558555000073,36.77406311099996],[9.913379668999978,36.773761749000165],[9.913928985000132,36.77334594700013],[9.91530990600008,36.77207183800014],[9.915636062000067,36.77141952500008],[9.916082383000136,36.77003097500021],[9.916472436,36.769485474000106],[9.917164803,36.76885986400012],[9.917993545,36.767940521],[9.919037819000065,36.767189026000075],[9.919915200000096,36.766311645000044],[9.920964241000119,36.765563965],[9.921807289000062,36.76465606700002],[9.9227352140001,36.763801575000016],[9.923080443000154,36.763156892000055],[9.923551560000055,36.76175308200008],[9.923724174000126,36.76144027700004],[9.924525261000062,36.76050949100012],[9.924842834000136,36.75985336300001],[9.925314903000116,36.75845336900009],[9.926248551,36.75719070500006],[9.926417350000028,36.756839752000154],[9.926632882000186,36.75560379100021],[9.92657756700014,36.7537422190001],[9.925779342,36.74541854900009],[9.925186157000033,36.73807144200006],[9.925004958999962,36.73666381800003],[9.924800874000129,36.73577499400003],[9.924456595000064,36.73496627900009],[9.924201966000046,36.734615327000185],[9.922415734000046,36.73301696800009],[9.920982360000197,36.7320251460001],[9.919956207000025,36.73113250700014],[9.918749810000216,36.73038864200005],[9.917587281000218,36.729568481000136],[9.91671275999998,36.729232788000076],[9.914193154000051,36.72861862200015],[9.91169643500015,36.727619172000146],[9.909873962000082,36.727001191000085],[9.907340050000036,36.72600936900009],[9.90407180800007,36.725322724000115],[9.90253639300004,36.72478866700007],[9.900347710000046,36.723804473],[9.899641037000196,36.7234268180001],[9.898530006000195,36.72253036600009],[9.897323609000031,36.721759797000104],[9.896508218000156,36.721080781000055],[9.895870208000124,36.720664979000205],[9.890988350000141,36.71827697700006],[9.889858246000072,36.71738815300015],[9.888628006000067,36.716636658000056],[9.887490272999989,36.71581649900005],[9.886669159000084,36.715488434],[9.884909630000072,36.71496963400015],[9.88451194800003,36.71478653],[9.883369445000179,36.71396637],[9.882159232999966,36.713211059000216],[9.88112926500001,36.712306977000104],[9.879957200000112,36.71152496300006],[9.878940582000018,36.71058654900004],[9.877784728000128,36.7097167980002],[9.874364853000051,36.705566406000074],[9.87323379500008,36.70462036200023],[9.87191581800001,36.70315170300003],[9.870764731999982,36.70225143400015],[9.868911743000053,36.70127105700013],[9.867998122000044,36.70067978000005],[9.86720562000002,36.700328828000146],[9.865687371000076,36.70006179800008],[9.862325669000105,36.699897766],[9.8606338500001,36.699695587999976],[9.860084534000036,36.69956588800008],[9.85906410100016,36.69918823200019],[9.856925011,36.69815444900009],[9.856263160000045,36.697696685000054],[9.855968476000088,36.6973762520001],[9.855141640000154,36.69599914500011],[9.854642869,36.69536209099998],[9.852573394000197,36.69394302400016],[9.851849556000081,36.6933250430001],[9.85052204100011,36.691883087000164],[9.849346161000073,36.69102859500007],[9.848545075000137,36.69033432000018],[9.84790039,36.68990326000013],[9.844859122999983,36.688529968000104],[9.844337462999986,36.68835449200006],[9.843203545000135,36.68811416600007],[9.842036248000097,36.687992095],[9.840250969000087,36.68792724700015],[9.833041191000047,36.68790054300016],[9.83186054100006,36.68782043500001],[9.830705641999982,36.68765258900007],[9.829621314000148,36.687332154000025],[9.828647613000141,36.68690490700011],[9.826999664000125,36.68607330300014],[9.826339722000055,36.68561172600014],[9.825815201000088,36.68494415200015],[9.825263023999964,36.68389511099995],[9.824823379000092,36.68326187100023],[9.823774337000069,36.682384492000196],[9.822816850000072,36.681427002000106],[9.822005272000068,36.68078994800007],[9.821497918000011,36.68023681700013],[9.820554734000131,36.67848205700007],[9.82032394300022,36.67816543700016],[9.819354058000085,36.677207946999985],[9.818921090000144,36.676540376000084],[9.818200111000086,36.67511749199995],[9.81677818200012,36.673488618],[9.816412925,36.67272949200007],[9.815776825000134,36.67105865400012],[9.814110757000128,36.6674537650001],[9.813691140000136,36.66612243799999],[9.813077926000025,36.66336059600009],[9.81313896200019,36.66145706200015],[9.813081741000074,36.65957260100011],[9.812914848000032,36.65765380900015],[9.812680245000072,36.65625763],[9.81223487900017,36.65499496399998],[9.812009811000022,36.65463638200007],[9.811105729,36.65364456300007],[9.810886383000062,36.65330123900018],[9.810562133000234,36.65251159700021],[9.810347558000066,36.65163803200014],[9.809949875000113,36.64831543100003],[9.809492111000074,36.641662597000064],[9.808629035000072,36.64121246300012]]]]}},{"type":"Feature","properties":{"GID_2":"TUN.13.2_1","GID_0":"TUN","COUNTRY":"Tunisia","GID_1":"TUN.13_1","NAME_1":"Manubah","NL_NAME_1":"NA","NAME_2":"Douar Hicher","VARNAME_2":"NA","NL_NAME_2":"NA","TYPE_2":"Delegation","ENGTYPE_2":"Delegation","CC_2":"NA","HASC_2":"TN.MN.DH"},"geometry":{"type":"MultiPolygon","coordinates":[[[[10.056227685000108,36.842807770000114],[10.056012155000039,36.842807770000114],[10.05435753,36.8429031370001],[10.053348542,36.843059539000166],[10.052482605000124,36.84334945700008],[10.051063538000127,36.84427642800013],[10.04782485900021,36.84575271500015],[10.044980050000019,36.84644699000013],[10.043089867000033,36.84743118400003],[10.041123390000129,36.8478851320002],[10.040740014000027,36.84870529100002],[10.040481567000048,36.84950637900014],[10.040268897000127,36.85107040400014],[10.040645600000031,36.851627350000214],[10.04113197300004,36.85212326100012],[10.041878700000096,36.852523804999954],[10.043552398000022,36.853149414000114],[10.04424572100019,36.853614808000074],[10.046298980000168,36.85589218300012],[10.055013656000112,36.843692779000065],[10.055850030000036,36.8430824280001],[10.056227685000108,36.842807770000114]]]]}},{"type":"Feature","properties":{"GID_2":"TUN.13.3_1","GID_0":"TUN","COUNTRY":"Tunisia","GID_1":"TUN.13_1","NAME_1":"Manubah","NL_NAME_1":"NA","NAME_2":"El Battan","VARNAME_2":"El Batane","NL_NAME_2":"NA","TYPE_2":"Delegation","ENGTYPE_2":"Delegation","CC_2":"NA","HASC_2":"TN.MN.BT"},"geometry":{"type":"MultiPolygon","coordinates":[[[[9.85547447300007,36.8399887080001],[9.857176779999966,36.838581086000076],[9.857623101000035,36.83800125200006],[9.857766152000059,36.83763122500009],[9.857911109999973,36.83683014000006],[9.857890129000102,36.83506774900017],[9.857608795000184,36.83276748700009],[9.857131005000086,36.83096313500001],[9.856697083000066,36.8301086420001],[9.855657577000121,36.82851791500011],[9.854769707000022,36.82650375300008],[9.854304313000151,36.82580566500023],[9.853236198000149,36.82490921100013],[9.852257729000014,36.82397842500021],[9.850240707000102,36.82261657800015],[9.849464416000087,36.82224273600022],[9.848471642000012,36.82202529900017],[9.84739208200004,36.821926116000135],[9.84219169500008,36.8218956000001],[9.840516090000085,36.82182312100023],[9.839473725000081,36.821674347000084],[9.838991165000122,36.82154464800019],[9.838210106000068,36.82115554800006],[9.836284638000093,36.81966781600006],[9.835822105000192,36.81900024400007],[9.835120201000203,36.81759643600019],[9.834901809000074,36.81728744600011],[9.833956719000126,36.816303253000214],[9.833727836000195,36.81595230100013],[9.833298684000214,36.814727784000155],[9.833081246000164,36.812938690000095],[9.833127976000034,36.8116378790002],[9.833311082000174,36.810859680000114],[9.833472252000186,36.81052017200009],[9.834220887000223,36.809555054000086],[9.834488869000191,36.80884933600014],[9.834617615000097,36.80759811500017],[9.834667205000114,36.8044166560001],[9.834844589000047,36.80353927700007],[9.835540771000096,36.801929474000104],[9.835796356000104,36.80108261200011],[9.83590698300002,36.79972076299996],[9.83590126100008,36.79658508400022],[9.836091042000062,36.79580688500013],[9.836274148000113,36.79546737600002],[9.838004112000077,36.79368591299997],[9.83905220100011,36.79294967600007],[9.839929582000051,36.79207992500014],[9.840985299000094,36.79134368800006],[9.841855049000115,36.79046249399998],[9.842898369000109,36.789710999000064],[9.843747138000081,36.78879928600013],[9.844742775000126,36.78796005200005],[9.847067834000123,36.784473419000136],[9.847525598000162,36.78392410299998],[9.848144532000125,36.78348922800015],[9.85142517100005,36.78154754699999],[9.8523178100001,36.781116486000116],[9.854069709000013,36.780475616000025],[9.85435867300012,36.777973174000095],[9.85439014399997,36.77654266400013],[9.854204178000126,36.77485656800015],[9.853646278999973,36.77257537899997],[9.852775574000228,36.772914887],[9.851792335000054,36.77318573000011],[9.850117684000137,36.77339553900006],[9.846632003000122,36.77344131400012],[9.844926834000079,36.773349762000095],[9.843850136000166,36.773223877000156],[9.842867851999982,36.77300262400006],[9.84243488400004,36.77284240800012],[9.841156007000096,36.772163392000074],[9.84022712799998,36.771888734000086],[9.83860874200001,36.771682739],[9.833990096000134,36.771457671000036],[9.832427025000035,36.77119064400015],[9.831974984000025,36.77103424100009],[9.830679893000072,36.770362855000045],[9.83027839700007,36.77022171100018],[9.829380990000159,36.77001190099996],[9.826971054000067,36.769649506000086],[9.826070785000097,36.76943206900022],[9.825336456,36.76910400400007],[9.82441616000015,36.76856231800011],[9.823587418000146,36.76824951100016],[9.821820258000036,36.76773071400013],[9.820176124000158,36.7668533330001],[9.81972408300006,36.76668167200002],[9.818700790000035,36.7664604190001],[9.817582130000025,36.76633834900012],[9.815199853,36.766242982000136],[9.809064865000073,36.76615524300016],[9.80730247500018,36.76618576200011],[9.805692673000122,36.76636505200011],[9.805220603000143,36.76649093600005],[9.804508209,36.76686477600007],[9.802774427999983,36.76822662500004],[9.801965713000127,36.76913833700016],[9.800010681000105,36.7706909180001],[9.799171447000033,36.77094650200011],[9.798232078000114,36.770984649000155],[9.797299384000125,36.770820619000084],[9.796870232000144,36.77065277100005],[9.794630051000153,36.769050598000184],[9.793655396000068,36.76811599700012],[9.791669845000095,36.766708374000096],[9.790890694000199,36.76631927500014],[9.789877891000154,36.76607894900015],[9.78819561000005,36.7659301770001],[9.786421777000099,36.76588440000013],[9.765776634000234,36.76575851400011],[9.764025688000045,36.76569366399998],[9.762396813,36.76547622600011],[9.761453629000128,36.765155793000154],[9.759102822000044,36.76358795200011],[9.758095742000117,36.762680055000125],[9.75694274800002,36.76189041099998],[9.755932808000123,36.760948181000096],[9.754781722000095,36.76007461500002],[9.751331330000069,36.755947114000016],[9.750171660999952,36.755081175999955],[9.749146461000036,36.75415420500018],[9.747968673000107,36.75337219400022],[9.746943474000192,36.752452851],[9.745786668000134,36.751605988],[9.74430465600008,36.749916077000165],[9.74161720300003,36.74794769200001],[9.739163400000129,36.746555329],[9.73803424900005,36.74567031800005],[9.736820220000054,36.744918822999956],[9.735003472000015,36.74341964700008],[9.734520912000145,36.74282455500005],[9.734360695000122,36.742454530000074],[9.734228134000078,36.741683961],[9.734339713999985,36.74093246600008],[9.734707830999978,36.74033737300014],[9.736247063000148,36.738861084000206],[9.736800194,36.73850250200011],[9.735592843000108,36.73754882800007],[9.727528572000066,36.73709106600003],[9.720089911000096,36.73820877100005],[9.714576721000013,36.743194580000115],[9.713884353000102,36.7438201910001],[9.705134393000082,36.748550415000054],[9.69680404700014,36.753959656000156],[9.68827629100012,36.7576484690001],[9.677598,36.764060974999985],[9.668846130000153,36.76860809300016],[9.660937309000095,36.7738609310002],[9.651792526000092,36.774940492000084],[9.641587258,36.77602005000014],[9.631154061000158,36.77880096500011],[9.621128082000075,36.78281021100001],[9.613232612000145,36.786331178000104],[9.61173820400022,36.786998749],[9.605530738000068,36.7934684750001],[9.609481811000043,36.79528427100006],[9.611294746000032,36.79590988200013],[9.613800048000021,36.79689407300012],[9.616330147000019,36.79748535100019],[9.617209435000118,36.797813415999975],[9.619582176000153,36.799354553000036],[9.621368408000064,36.800918579000125],[9.621868134000112,36.80153274600005],[9.622298241,36.80275344800007],[9.622491836000203,36.804115296000035],[9.622758865000092,36.807884216000126],[9.622890472000146,36.808776855],[9.623124123000116,36.80961227400011],[9.623307228000078,36.81000137300006],[9.623819350000174,36.81062316900009],[9.625172616000144,36.81166839600006],[9.625814438000047,36.812076569000084],[9.626276970000125,36.812255860000086],[9.627301215999962,36.81246185300007],[9.628405570000032,36.81254577700018],[9.632472993000041,36.812614442],[9.633584022999953,36.812713624000125],[9.634602548000116,36.81293487500013],[9.63538646700014,36.81331253000012],[9.637099265000016,36.814498901000135],[9.638358116,36.81562042300011],[9.64033412900015,36.817016601],[9.641101837000166,36.817401887000166],[9.642099381000014,36.817638398000014],[9.64318657,36.81775283800007],[9.644908906000039,36.817821504000065],[9.658646584000097,36.81787109400008],[9.660339356000092,36.81797027600012],[9.661872863000143,36.818271637000095],[9.662648202000168,36.81865310800013],[9.66466045400004,36.82003784300004],[9.665662766000017,36.820953370000026],[9.666817665000094,36.82175445600005],[9.66782569900001,36.8226814270001],[9.668987274000107,36.823474884000206],[9.670012475000112,36.82438659700014],[9.671206473000138,36.82515716500022],[9.672027589000132,36.82579040500012],[9.672739030000022,36.826183318000034],[9.674938203,36.826850892000024],[9.676617622000128,36.82770156899998],[9.67753791699998,36.82797241200009],[9.678567886000023,36.82812118600006],[9.682358741000064,36.82841873300008],[9.683340072,36.8286209100002],[9.683777809999972,36.82878112800004],[9.685456276000115,36.82963943500009],[9.687240600000136,36.83014297600019],[9.688079834000119,36.830463409000146],[9.689310074000124,36.83119964600022],[9.689707755000077,36.831367493000165],[9.691886902,36.83205413800013],[9.692579270000168,36.832435609000164],[9.693389893000093,36.83306884800007],[9.695749283000088,36.83460998600013],[9.69619846400004,36.83479690700014],[9.697216987000024,36.83503723100013],[9.699501991000082,36.835208893000214],[9.706218719000093,36.83522796700019],[9.709150314000093,36.835369111000055],[9.710704804000015,36.835655212000106],[9.712853432000069,36.83665084900006],[9.713849069000025,36.83686447100015],[9.71551322900005,36.83702850400013],[9.732295036000094,36.83727645800004],[9.735655785000164,36.83723449800012],[9.73668098400008,36.83713912899996],[9.737594604,36.83694839500008],[9.739537240000152,36.83600997899997],[9.741006851000156,36.83576202400015],[9.743846894000042,36.83568191600009],[9.7528400430002,36.835849761000034],[9.755050659000053,36.8357315060002],[9.756012917000179,36.83553314200013],[9.756425857000151,36.83537673900007],[9.757912636000155,36.834537507000086],[9.759995461000093,36.83393096900008],[9.761487961000215,36.83308410700009],[9.76186466100003,36.83293914700008],[9.762726784000042,36.832740783000105],[9.765074729000068,36.832435609000164],[9.765933037000119,36.832248688000064],[9.766606331000139,36.831958771000146],[9.76746845200015,36.83146667600002],[9.768351555000121,36.831203461],[9.769387246000106,36.83106231700005],[9.77108669300012,36.83097839300003],[9.77762031500008,36.83100891200016],[9.779262542000067,36.83118438700002],[9.780248643000034,36.83147811900008],[9.780681610000064,36.83172226000003],[9.781291009000126,36.83234787000019],[9.782034874000123,36.83369064300009],[9.783109664000145,36.834995271000125],[9.783308983000117,36.83534622200003],[9.783658028000131,36.83655166700002],[9.78394985100003,36.83870315500005],[9.784154891000119,36.839527131000104],[9.78456306500014,36.840290069000076],[9.784898758000205,36.840629578000105],[9.785329818000077,36.84090042100022],[9.786307334000222,36.84121704000022],[9.787916184000023,36.84138870300003],[9.798613548000146,36.84148788500006],[9.800292969000102,36.84144592299997],[9.801783562000066,36.8412017820002],[9.802511216000054,36.840835572000096],[9.80392360700021,36.83961486800017],[9.804330826000152,36.838993073000054],[9.804449082000167,36.838596345000184],[9.804537773000133,36.83773422200008],[9.804471970000106,36.8363304140001],[9.803610802000085,36.82944107100011],[9.803648949000133,36.82811355600005],[9.803938864999962,36.827323914000175],[9.804235459000077,36.826980591],[9.80463123300005,36.826717376],[9.80508232100007,36.82654571500009],[9.806077958000115,36.826362609000036],[9.807725906000131,36.82630157400005],[9.812494278999962,36.826404571000225],[9.81539344700012,36.826580047000085],[9.816926956,36.82690429700009],[9.817685127000109,36.827289582000084],[9.818496705000113,36.827903749],[9.819673538000051,36.82863235500017],[9.82080745600017,36.82944107100011],[9.8212490090002,36.82963180500017],[9.822259904,36.82987213099998],[9.823371887999988,36.829994202000044],[9.825139999000088,36.83006286700013],[9.833063125000175,36.83007431000019],[9.834761620000021,36.830219270000015],[9.835786820000115,36.830455781000225],[9.83657360000011,36.83083724900017],[9.83859062200011,36.832218171000115],[9.839595794000145,36.833133699000015],[9.840745925,36.83393096900008],[9.8417539600001,36.83485412700017],[9.842910767000069,36.83564758400009],[9.843925476000093,36.836563110000085],[9.84510230900012,36.837356567],[9.846211434000052,36.83826446700008],[9.84692096700005,36.83865738000017],[9.8495998380001,36.83983993600005],[9.850123405000078,36.84001159600004],[9.85121631600009,36.84022522100004],[9.852332114999951,36.84030151500023],[9.85344791500008,36.8402786260002],[9.85547447300007,36.8399887080001]]]]}},{"type":"Feature","properties":{"GID_2":"TUN.13.4_1","GID_0":"TUN","COUNTRY":"Tunisia","GID_1":"TUN.13_1","NAME_1":"Manubah","NL_NAME_1":"NA","NAME_2":"Jedaida","VARNAME_2":"Jdaida","NL_NAME_2":"NA","TYPE_2":"Delegation","ENGTYPE_2":"Delegation","CC_2":"NA","HASC_2":"TN.MN.JE"},"geometry":{"type":"MultiPolygon","coordinates":[[[[9.932314873000204,36.863132477000114],[9.927631379000024,36.863109589000175],[9.926527022000043,36.86303329500008],[9.925491334000148,36.862869262000096],[9.924575806000158,36.86254882700005],[9.92251968400012,36.86117935300016],[9.921225549000068,36.86005783100009],[9.92006874200001,36.85927200400008],[9.919053077000084,36.858356476],[9.917879104000027,36.85757446399996],[9.916856766,36.85663986300008],[9.915698052000133,36.8557662970001],[9.912247658000107,36.85163497900013],[9.911087989000167,36.85076522800002],[9.910061836,36.84983825699997],[9.908879280000027,36.849067688000076],[9.907846452000102,36.848171234000155],[9.906665802000115,36.84740448000022],[9.905655862000218,36.84647369400003],[9.904548645000089,36.845573425000154],[9.904104234000089,36.84497833400012],[9.902905465000023,36.8427238460001],[9.897502900000033,36.84265136700005],[9.89532470700002,36.84247589200001],[9.894348144000132,36.84226608200006],[9.89391231600022,36.84210586700013],[9.892254829000125,36.841243744000025],[9.890072822000063,36.84056854200011],[9.889369011,36.84017562900002],[9.88855457300012,36.8395347590002],[9.887368202000102,36.838764190000035],[9.886343002,36.837856293000144],[9.884002685000082,36.83626556300007],[9.883178711000118,36.83593368500014],[9.881420136,36.8354072580001],[9.88070964800002,36.83503341800017],[9.879875184000165,36.83440399100014],[9.87867164700006,36.833641053000164],[9.877654075000065,36.83272171000012],[9.876503943000204,36.83192443900006],[9.87549781800009,36.8310050970002],[9.873112679,36.82944488600007],[9.872674941000115,36.82926941000021],[9.87169647300007,36.829055785000115],[9.8674030290001,36.82873535300016],[9.866420746000093,36.828529358],[9.865979195000063,36.82836150999996],[9.863574027000011,36.826843262000104],[9.86154174700008,36.825004578000026],[9.861150741000058,36.82436752300008],[9.860990524000036,36.82395172100004],[9.860773085999986,36.82305145400007],[9.860582352000014,36.821613312000096],[9.85772419000014,36.788539887000155],[9.857432365000063,36.7861099250001],[9.857220650000043,36.785202028000114],[9.856885908999969,36.784370422000144],[9.856649398000028,36.784008027],[9.855437279000101,36.78269958500019],[9.854069709000013,36.780475616000025],[9.8523178100001,36.781116486000116],[9.85142517100005,36.78154754699999],[9.848144532000125,36.78348922800015],[9.847525598000162,36.78392410299998],[9.847067834000123,36.784473419000136],[9.844742775000126,36.78796005200005],[9.843747138000081,36.78879928600013],[9.842898369000109,36.789710999000064],[9.841855049000115,36.79046249399998],[9.840985299000094,36.79134368800006],[9.839929582000051,36.79207992500014],[9.83905220100011,36.79294967600007],[9.838004112000077,36.79368591299997],[9.836274148000113,36.79546737600002],[9.836091042000062,36.79580688500013],[9.83590126100008,36.79658508400022],[9.83590698300002,36.79972076299996],[9.835796356000104,36.80108261200011],[9.835540771000096,36.801929474000104],[9.834844589000047,36.80353927700007],[9.834667205000114,36.8044166560001],[9.834617615000097,36.80759811500017],[9.834488869000191,36.80884933600014],[9.834220887000223,36.809555054000086],[9.833472252000186,36.81052017200009],[9.833311082000174,36.810859680000114],[9.833127976000034,36.8116378790002],[9.833081246000164,36.812938690000095],[9.833298684000214,36.814727784000155],[9.833727836000195,36.81595230100013],[9.833956719000126,36.816303253000214],[9.834901809000074,36.81728744600011],[9.835120201000203,36.81759643600019],[9.835822105000192,36.81900024400007],[9.836284638000093,36.81966781600006],[9.838210106000068,36.82115554800006],[9.838991165000122,36.82154464800019],[9.839473725000081,36.821674347000084],[9.840516090000085,36.82182312100023],[9.84219169500008,36.8218956000001],[9.84739208200004,36.821926116000135],[9.848471642000012,36.82202529900017],[9.849464416000087,36.82224273600022],[9.850240707000102,36.82261657800015],[9.852257729000014,36.82397842500021],[9.853236198000149,36.82490921100013],[9.854304313000151,36.82580566500023],[9.854769707000022,36.82650375300008],[9.855657577000121,36.82851791500011],[9.856697083000066,36.8301086420001],[9.857131005000086,36.83096313500001],[9.857608795000184,36.83276748700009],[9.857890129000102,36.83506774900017],[9.857911109999973,36.83683014000006],[9.857766152000059,36.83763122500009],[9.857623101000035,36.83800125200006],[9.857176779999966,36.838581086000076],[9.85547447300007,36.8399887080001],[9.856114388000082,36.841735840000155],[9.856600761,36.84410095300009],[9.856801033000052,36.846401215000164],[9.856755258000172,36.84725952100022],[9.856554031000131,36.848033905000165],[9.85613918400018,36.848632813000066],[9.854454995000184,36.85005950899998],[9.85367584300011,36.85037612900007],[9.852007865000123,36.85081863500009],[9.851643563,36.85096740699996],[9.850508690000071,36.85163497900013],[9.849605560000041,36.85190963800003],[9.847996712000151,36.85208129900011],[9.845647812000136,36.85210418800014],[9.843242645,36.851997375000096],[9.841476440000141,36.851757049000106],[9.840378761,36.85144805900021],[9.83837985900008,36.85069274900015],[9.835421563,36.84990310700001],[9.834684371000114,36.849525452000115],[9.833442688000138,36.84872055199995],[9.830896378000132,36.847549438999955],[9.829882621,36.847152711],[9.828151703000144,36.84679412900008],[9.826359749000025,36.846637727000015],[9.824574470000014,36.84656524600015],[9.822862625000129,36.84658050599999],[9.821805955000096,36.846687317000125],[9.820856095000108,36.84697723500004],[9.820453644000205,36.8472442630002],[9.820160866000139,36.847583771000224],[9.819872857000112,36.84836959800005],[9.819808959000154,36.8492279060001],[9.819892883,36.85060882500014],[9.82058525,36.85590744100014],[9.82080745600017,36.856788635000136],[9.821134566000145,36.8575859070002],[9.821357727000047,36.85793304400014],[9.822266579000106,36.85891723700022],[9.822487832000027,36.85926437300007],[9.822808264999983,36.86006164600005],[9.823152543000047,36.86187744100019],[9.823596954000136,36.866725923000075],[9.823937414999973,36.86854934600022],[9.824253082000068,36.869350433000065],[9.82447338,36.86970138499997],[9.825372695000157,36.870704652000114],[9.82575512000009,36.871414185000205],[9.826006889000139,36.872230531000156],[9.826526640999978,36.87485504100006],[9.826775550999967,36.87567520200007],[9.827156066000098,36.876396179000125],[9.82804965999996,36.87741088900006],[9.828260422,36.87775421200004],[9.828565597000106,36.87853240900004],[9.829197884000108,36.88157653900002],[9.829449653000067,36.882392884000154],[9.829832076,36.88310623300011],[9.83072853100001,36.88410568200012],[9.831114769,36.88483047600014],[9.831525803000075,36.8865509040002],[9.83209895999998,36.89175033600017],[9.832310677,36.89268112200009],[9.832650185000025,36.89357757600019],[9.833900452,36.89558792100017],[9.834807397000167,36.89759063700005],[9.835282326000117,36.89827346900015],[9.836365700000139,36.8991584780001],[9.837359429000115,36.90010070900017],[9.838232040000195,36.90072250400019],[9.838781358000082,36.90121078400009],[9.841033936000121,36.90387344400004],[9.84172916400009,36.90478897100003],[9.842781068000173,36.905761720000136],[9.843276024,36.90633392400005],[9.84420585700011,36.908107757],[9.845355988000149,36.90941619900018],[9.845561981000051,36.90974044900018],[9.845862390000127,36.91046524000011],[9.846405030000083,36.91241836600015],[9.846734048000128,36.913143158],[9.846966744000019,36.913463593000216],[9.849034309000205,36.915294647000195],[9.850213051000123,36.91606521700018],[9.85122776100006,36.91697693000012],[9.852063178000082,36.91759872400005],[9.852587700000049,36.91814422700007],[9.853537559000037,36.91988754400016],[9.854696274000075,36.92118072500004],[9.854922294000213,36.92152786300008],[9.855354309000164,36.922748566000095],[9.855586053000065,36.92410659900001],[9.856270790000144,36.931251526000196],[9.856185913000138,36.93254089400003],[9.85590267300015,36.933292390000034],[9.855641365000023,36.93360519399998],[9.855299950000108,36.93384933600011],[9.85300159400001,36.93467712500021],[9.852010728000094,36.93544387800015],[9.85092544500018,36.936153411000056],[9.850045204,36.93702697700004],[9.849003792000167,36.93777847300014],[9.848141669000066,36.93866729700014],[9.847105026000092,36.93942260700001],[9.846246720000218,36.94033050500017],[9.845235825000065,36.94116973900007],[9.843496322000112,36.943714143],[9.842749595999967,36.944976807000025],[9.841686249,36.94618606599998],[9.841365814000048,36.94684219400009],[9.841025353000122,36.947902679],[9.840679168999989,36.94854354900018],[9.83975124299995,36.94939041200017],[9.838912009000145,36.95029449400019],[9.837873458000102,36.951042175999966],[9.83702564300003,36.95193862900007],[9.836082459000151,36.95277786300014],[9.835723877000058,36.95341873300005],[9.835243225,36.95480346800023],[9.834320069,36.95607376200017],[9.834155084000107,36.95642471400008],[9.833980560000144,36.9572257990001],[9.833952904000077,36.9585762020001],[9.834292412000101,36.96293640100018],[9.834353448,36.96515274000015],[9.832716941000042,36.965877534000164],[9.83096790400001,36.966812133000225],[9.829461099000126,36.967510223000076],[9.828063011000088,36.968456268000104],[9.827287673999974,36.96875381400012],[9.826991081000036,36.968833923000176],[9.830846786000203,36.968811036000055],[9.835820199000123,36.96886825700008],[9.843621255000057,36.96895980900011],[9.860224723000089,36.96950149600016],[9.87344646500018,36.96670913800014],[9.88835620900005,36.965679170000186],[9.893522263000099,36.96411895700005],[9.89756298000003,36.96289825499995],[9.898811341000025,36.96252059900014],[9.906970978000052,36.96007538000006],[9.908837318000108,36.95951843300017],[9.911155702000086,36.9581146250001],[9.916103364,36.955120087000225],[9.925987244000146,36.94055938800001],[9.926147462000168,36.94015884400009],[9.928783418000043,36.933498382000025],[9.929665565000201,36.93127060000008],[9.931011199999984,36.930076599000145],[9.935229302000115,36.92633056600008],[9.94459629100003,36.92573928800001],[9.955422401000058,36.93000030500005],[9.962863922000087,36.931179046000146],[9.970272064000019,36.932350158000055],[9.970995903000224,36.93183136100012],[9.971862794000097,36.93095016500022],[9.97290420500011,36.93020248500008],[9.973737717000153,36.9292945870001],[9.974448205000142,36.92868042100018],[9.974862099000104,36.92814254800008],[9.975499152000145,36.9264144900001],[9.975882530000069,36.92586517400012],[9.97677421700004,36.924926758000105],[9.978184700000126,36.92255020100002],[9.978489875000063,36.92171478200018],[9.978638649000116,36.9203453060002],[9.978603363000039,36.91893005400007],[9.97835731600002,36.91604995700007],[9.97808837800015,36.914150238],[9.977858543000051,36.91322326699996],[9.977491377999959,36.912334443000226],[9.9769554130002,36.91152954200006],[9.975597382000101,36.90982437200002],[9.975081445000134,36.90928268500014],[9.973908425000067,36.90846252400023],[9.97291088100013,36.90754699800006],[9.972101213000107,36.906917572000026],[9.97159385700005,36.90632247900008],[9.97140312199999,36.9059448230001],[9.97114753800007,36.90510940599999],[9.970993996000155,36.904212952000066],[9.970644952000141,36.90044784600011],[9.970320702000135,36.8986625670001],[9.970013618000129,36.8978767400001],[9.969799995000129,36.89753341700011],[9.96889972799998,36.89653015200006],[9.968524932999967,36.89581680400019],[9.968285561000057,36.8949966430001],[9.967812539,36.892356874],[9.967370986000146,36.89115524300023],[9.966868400000218,36.89055252200009],[9.966057777000115,36.88990783700022],[9.965325355000088,36.889209747000194],[9.963877678000122,36.8882179250002],[9.962874413000156,36.887298584000156],[9.961796760000075,36.88642883400023],[9.961348534000114,36.88577652100017],[9.960832595000147,36.88471221900012],[9.960383416000107,36.88405227700005],[9.958495140000101,36.882469178000164],[9.95785141000013,36.8820381160002],[9.954458236000042,36.880371095000115],[9.953298569000102,36.87987136899998],[9.95203304300002,36.879108428000094],[9.951256751000093,36.8787651070002],[9.950293541000155,36.878566743000036],[9.94925403700021,36.8784751890001],[9.94546890200011,36.878433227],[9.944437027000086,36.87836837800015],[9.94345855800013,36.87818145700013],[9.942999839000189,36.87800598200009],[9.94257736200005,36.87775421200004],[9.942227362999956,36.87741851900016],[9.941978454000056,36.877044679000136],[9.94168281500002,36.876228333],[9.941497804000077,36.87490844700004],[9.941248894000088,36.870716095000176],[9.941076279000105,36.869846343999974],[9.94075012100012,36.86904907200009],[9.940224647000074,36.86843872100022],[9.938834191000046,36.86741638300018],[9.938200951000054,36.867031097],[9.93782710900003,36.866886138],[9.936978340000147,36.86669921900008],[9.934644700000062,36.86638641400005],[9.93376827200011,36.866092683],[9.933377266,36.865852357000094],[9.933053970999984,36.865531922000045],[9.932649612000011,36.86478805500005],[9.932314873000204,36.863132477000114]]]]}},{"type":"Feature","properties":{"GID_2":"TUN.13.5_1","GID_0":"TUN","COUNTRY":"Tunisia","GID_1":"TUN.13_1","NAME_1":"Manubah","NL_NAME_1":"NA","NAME_2":"Manouba","VARNAME_2":"NA","NL_NAME_2":"NA","TYPE_2":"Delegation","ENGTYPE_2":"Delegation","CC_2":"NA","HASC_2":"TN.MN.MA"},"geometry":{"type":"MultiPolygon","coordinates":[[[[10.056227685000108,36.842807770000114],[10.071436882000151,36.83174514900006],[10.073467255000102,36.83100128200006],[10.08026409100008,36.82851028500019],[10.076749802000096,36.82614898700022],[10.072959899000045,36.825080872000214],[10.067840576000131,36.823638916],[10.061143875000178,36.82305526700012],[10.05891990600002,36.8228607180001],[10.049390792000102,36.816040040000104],[10.043679237000125,36.810451508000185],[10.03325939100005,36.811550140000044],[10.028686523999964,36.8125267030002],[10.028647423000015,36.81279754600005],[10.028658868000074,36.81417083800008],[10.028853417000095,36.81558990400008],[10.029296875000105,36.81697082600002],[10.029767990000094,36.81774520800015],[10.030592919000048,36.818683624000165],[10.029843331000022,36.82147216800014],[10.029334067000073,36.824588776000084],[10.029047966000027,36.825313568000105],[10.028326035000068,36.82629394600022],[10.027994156999965,36.827293394999955],[10.027894020000117,36.8285865780002],[10.027973176000094,36.830421447000134],[10.028140069000225,36.83180999700009],[10.028479576999983,36.8331680300001],[10.028905869000083,36.834022523000016],[10.02921104400002,36.83441543600011],[10.029941558000067,36.83509826600012],[10.03076934700008,36.83564376900004],[10.032179833000077,36.83637237600002],[10.033307076,36.837226868000116],[10.034521103,36.83796691999997],[10.036575316999963,36.83979415900008],[10.036812783000071,36.840137481999975],[10.037129402000156,36.84091949400002],[10.037673950000093,36.8439712520001],[10.038127899000171,36.84518432600011],[10.03865241900005,36.84580612300013],[10.039868356000026,36.84674835200011],[10.041123390000129,36.8478851320002],[10.043089867000033,36.84743118400003],[10.044980050000019,36.84644699000013],[10.04782485900021,36.84575271500015],[10.051063538000127,36.84427642800013],[10.052482605000124,36.84334945700008],[10.053348542,36.843059539000166],[10.05435753,36.8429031370001],[10.056012155000039,36.842807770000114],[10.056227685000108,36.842807770000114]]]]}},{"type":"Feature","properties":{"GID_2":"TUN.13.6_1","GID_0":"TUN","COUNTRY":"Tunisia","GID_1":"TUN.13_1","NAME_1":"Manubah","NL_NAME_1":"NA","NAME_2":"Mornaguia","VARNAME_2":"NA","NL_NAME_2":"NA","TYPE_2":"Delegation","ENGTYPE_2":"Delegation","CC_2":"NA","HASC_2":"TN.MN.MO"},"geometry":{"type":"MultiPolygon","coordinates":[[[[10.007774352000032,36.813316345000075],[10.005628586000215,36.81351089400019],[9.994375229000097,36.81184005800005],[9.987593651000138,36.808319091000136],[9.984870911000188,36.80173111000012],[9.99339485100016,36.796989440000104],[10.000008583000087,36.7920494090001],[10.004301072000066,36.783470154000085],[10.006414413000043,36.77524566600002],[10.00669097900001,36.774169921000095],[10.010130882000146,36.76575088600019],[10.012928963000112,36.758880615],[10.02355861700014,36.75450134400021],[10.033341408,36.75270080500009],[10.039110183000089,36.745861054000024],[10.041701317000074,36.73691177500003],[10.043431283000038,36.730709077],[10.041760444000081,36.72344970700013],[10.041028977000044,36.722694396000165],[10.033321381000027,36.71472931000007],[10.029748917000026,36.707439424000064],[10.020878791000188,36.699241638000075],[10.014749526000022,36.69417190500009],[10.005041122000014,36.68613052299999],[10.00039005300003,36.68175888100021],[9.989811898000179,36.67734146100011],[9.98353481300004,36.67350387600002],[9.979453087,36.67100906400001],[9.972914696,36.66490173300015],[9.971701622,36.66345977800022],[9.962270737000123,36.67185974200005],[9.955307961000093,36.67504501300008],[9.951210021000223,36.67692184400003],[9.951078415000081,36.676971436000045],[9.943567276000065,36.67981720000014],[9.940580368000019,36.680950165],[9.92829132,36.67890930200016],[9.919425012000127,36.672248840000094],[9.911868095000143,36.66043090900016],[9.90432929999997,36.64654159499999],[9.901449204000057,36.634876251000065],[9.900610923000064,36.631481172000086],[9.89686203000012,36.62194061300002],[9.892472267000175,36.61273956400007],[9.885112762,36.604549408],[9.876276970000076,36.59563827500015],[9.86422920300013,36.591190339],[9.857828140000036,36.59156799400008],[9.853419304000111,36.59182739400005],[9.847272873000035,36.5921897890001],[9.845538140000121,36.591640473000126],[9.842553140000055,36.59989929200001],[9.842138290000014,36.60050964300015],[9.835908891,36.609661102],[9.82736206000009,36.618888855000115],[9.827205658000116,36.61902618400002],[9.81967926000008,36.625530243000114],[9.813694,36.63183975200009],[9.809391021000058,36.63990020700008],[9.80931186700017,36.64003753799999],[9.808629035000072,36.64121246300012],[9.809492111000074,36.641662597000064],[9.809949875000113,36.64831543100003],[9.810347558000066,36.65163803200014],[9.810562133000234,36.65251159700021],[9.810886383000062,36.65330123900018],[9.811105729,36.65364456300007],[9.812009811000022,36.65463638200007],[9.81223487900017,36.65499496399998],[9.812680245000072,36.65625763],[9.812914848000032,36.65765380900015],[9.813081741000074,36.65957260100011],[9.81313896200019,36.66145706200015],[9.813077926000025,36.66336059600009],[9.813691140000136,36.66612243799999],[9.814110757000128,36.6674537650001],[9.815776825000134,36.67105865400012],[9.816412925,36.67272949200007],[9.81677818200012,36.673488618],[9.818200111000086,36.67511749199995],[9.818921090000144,36.676540376000084],[9.819354058000085,36.677207946999985],[9.82032394300022,36.67816543700016],[9.820554734000131,36.67848205700007],[9.821497918000011,36.68023681700013],[9.822005272000068,36.68078994800007],[9.822816850000072,36.681427002000106],[9.823774337000069,36.682384492000196],[9.824823379000092,36.68326187100023],[9.825263023999964,36.68389511099995],[9.825815201000088,36.68494415200015],[9.826339722000055,36.68561172600014],[9.826999664000125,36.68607330300014],[9.828647613000141,36.68690490700011],[9.829621314000148,36.687332154000025],[9.830705641999982,36.68765258900007],[9.83186054100006,36.68782043500001],[9.833041191000047,36.68790054300016],[9.840250969000087,36.68792724700015],[9.842036248000097,36.687992095],[9.843203545000135,36.68811416600007],[9.844337462999986,36.68835449200006],[9.844859122999983,36.688529968000104],[9.84790039,36.68990326000013],[9.848545075000137,36.69033432000018],[9.849346161000073,36.69102859500007],[9.85052204100011,36.691883087000164],[9.851849556000081,36.6933250430001],[9.852573394000197,36.69394302400016],[9.854642869,36.69536209099998],[9.855141640000154,36.69599914500011],[9.855968476000088,36.6973762520001],[9.856263160000045,36.697696685000054],[9.856925011,36.69815444900009],[9.85906410100016,36.69918823200019],[9.860084534000036,36.69956588800008],[9.8606338500001,36.699695587999976],[9.862325669000105,36.699897766],[9.865687371000076,36.70006179800008],[9.86720562000002,36.700328828000146],[9.867998122000044,36.70067978000005],[9.868911743000053,36.70127105700013],[9.870764731999982,36.70225143400015],[9.87191581800001,36.70315170300003],[9.87323379500008,36.70462036200023],[9.874364853000051,36.705566406000074],[9.877784728000128,36.7097167980002],[9.878940582000018,36.71058654900004],[9.879957200000112,36.71152496300006],[9.88112926500001,36.712306977000104],[9.882159232999966,36.713211059000216],[9.883369445000179,36.71396637],[9.88451194800003,36.71478653],[9.884909630000072,36.71496963400015],[9.886669159000084,36.715488434],[9.887490272999989,36.71581649900005],[9.888628006000067,36.716636658000056],[9.889858246000072,36.71738815300015],[9.890988350000141,36.71827697700006],[9.895870208000124,36.720664979000205],[9.896508218000156,36.721080781000055],[9.897323609000031,36.721759797000104],[9.898530006000195,36.72253036600009],[9.899641037000196,36.7234268180001],[9.900347710000046,36.723804473],[9.90253639300004,36.72478866700007],[9.90407180800007,36.725322724000115],[9.907340050000036,36.72600936900009],[9.909873962000082,36.727001191000085],[9.91169643500015,36.727619172000146],[9.914193154000051,36.72861862200015],[9.91671275999998,36.729232788000076],[9.917587281000218,36.729568481000136],[9.918749810000216,36.73038864200005],[9.919956207000025,36.73113250700014],[9.920982360000197,36.7320251460001],[9.922415734000046,36.73301696800009],[9.924201966000046,36.734615327000185],[9.924456595000064,36.73496627900009],[9.924800874000129,36.73577499400003],[9.925004958999962,36.73666381800003],[9.925186157000033,36.73807144200006],[9.925779342,36.74541854900009],[9.92657756700014,36.7537422190001],[9.926632882000186,36.75560379100021],[9.926417350000028,36.756839752000154],[9.926248551,36.75719070500006],[9.925314903000116,36.75845336900009],[9.924842834000136,36.75985336300001],[9.924525261000062,36.76050949100012],[9.923724174000126,36.76144027700004],[9.923551560000055,36.76175308200008],[9.923080443000154,36.763156892000055],[9.9227352140001,36.763801575000016],[9.921807289000062,36.76465606700002],[9.920964241000119,36.765563965],[9.919915200000096,36.766311645000044],[9.919037819000065,36.767189026000075],[9.917993545,36.767940521],[9.917164803,36.76885986400012],[9.916472436,36.769485474000106],[9.916082383000136,36.77003097500021],[9.915636062000067,36.77141952500008],[9.91530990600008,36.77207183800014],[9.913928985000132,36.77334594700013],[9.913379668999978,36.773761749000165],[9.912558555000073,36.77406311099996],[9.911610602999977,36.774219513000205],[9.9076671610001,36.774421693000235],[9.906860351000136,36.774410247000084],[9.905693054,36.774173736000236],[9.904540062,36.773803711],[9.902998925000118,36.772903442000114],[9.902593613000066,36.77274322600009],[9.901675225000018,36.772529602],[9.900155067,36.772415161000126],[9.89911079500011,36.77244949300003],[9.898084640000027,36.77258300900016],[9.8971033090001,36.772850037000225],[9.895218850000143,36.773548126999984],[9.894145965000101,36.773769379000086],[9.892432212000058,36.773914337000086],[9.890662194000155,36.77394867],[9.88226890600007,36.77385711600006],[9.879407882000224,36.773704529000135],[9.877888680000114,36.773418426],[9.877455710000083,36.773258210000066],[9.876198769000089,36.772579194000016],[9.875291824000099,36.77229690600011],[9.874254228000135,36.772132873000125],[9.87256908400006,36.77201843300007],[9.857692719000111,36.77185440000009],[9.855476379999962,36.77202224800012],[9.854489327000094,36.77224731600009],[9.853646278999973,36.77257537899997],[9.854204178000126,36.77485656800015],[9.85439014399997,36.77654266400013],[9.85435867300012,36.777973174000095],[9.854069709000013,36.780475616000025],[9.855437279000101,36.78269958500019],[9.856649398000028,36.784008027],[9.856885908999969,36.784370422000144],[9.857220650000043,36.785202028000114],[9.857432365000063,36.7861099250001],[9.85772419000014,36.788539887000155],[9.860582352000014,36.821613312000096],[9.860773085999986,36.82305145400007],[9.860990524000036,36.82395172100004],[9.861150741000058,36.82436752300008],[9.86154174700008,36.825004578000026],[9.863574027000011,36.826843262000104],[9.865979195000063,36.82836150999996],[9.866420746000093,36.828529358],[9.8674030290001,36.82873535300016],[9.87169647300007,36.829055785000115],[9.872674941000115,36.82926941000021],[9.873112679,36.82944488600007],[9.87549781800009,36.8310050970002],[9.876503943000204,36.83192443900006],[9.877654075000065,36.83272171000012],[9.87867164700006,36.833641053000164],[9.879875184000165,36.83440399100014],[9.88070964800002,36.83503341800017],[9.881420136,36.8354072580001],[9.883178711000118,36.83593368500014],[9.884002685000082,36.83626556300007],[9.886343002,36.837856293000144],[9.887368202000102,36.838764190000035],[9.88855457300012,36.8395347590002],[9.889369011,36.84017562900002],[9.890072822000063,36.84056854200011],[9.892254829000125,36.841243744000025],[9.89391231600022,36.84210586700013],[9.894348144000132,36.84226608200006],[9.89532470700002,36.84247589200001],[9.897502900000033,36.84265136700005],[9.902905465000023,36.8427238460001],[9.903299331000104,36.84136581500009],[9.903415678999961,36.84049224900011],[9.9033851630001,36.83871078499997],[9.903164863,36.83738327],[9.902886391999955,36.83652877800009],[9.902430535000162,36.83571243200013],[9.900556565,36.833339691],[9.899266242000094,36.8321342470001],[9.898838997,36.83142471400019],[9.89846897200003,36.83017730800019],[9.89825725500001,36.828819274],[9.897870064000037,36.825065613000014],[9.89778614000002,36.82326507600008],[9.897955894000033,36.82203292900009],[9.898110390000026,36.821662904000206],[9.898615837000014,36.82107543900018],[9.901180267000187,36.819629669000015],[9.902968406000168,36.81880569500005],[9.904081345000149,36.818065643000104],[9.904494285000032,36.817905425000085],[9.905447007,36.81771087600006],[9.90705776199995,36.817607879000064],[9.92410373600009,36.81788253900005],[9.926396371000157,36.81779861500004],[9.928016662000106,36.8175277700001],[9.930357934000112,36.816581726000074],[9.932059289000106,36.815994263000135],[9.93397140600022,36.815170287000086],[9.934847832,36.81489944400015],[9.936764717000058,36.814472199000235],[9.93757343200018,36.81415557900006],[9.938578605000126,36.81336212200004],[9.939672471000128,36.81266021700006],[9.940649032000104,36.81186676000013],[9.94140529700015,36.81155395500009],[9.942665101000204,36.81121063200002],[9.94342231700015,36.810894012000205],[9.944395065000078,36.81008911200022],[9.945466995000219,36.809360505000065],[9.946147918999982,36.80870056100017],[9.946707725000115,36.80828476000014],[9.949501991000032,36.80696869000005],[9.94999217900009,36.806800842000015],[9.95108413800011,36.8065795900001],[9.953416825000117,36.80643844600005],[9.95763397200008,36.80644989100002],[9.960590363000088,36.80651855400011],[9.962257386,36.806686402000054],[9.96326827900006,36.80695343000012],[9.9637174600001,36.80715942400011],[9.964339256000121,36.80762481600007],[9.966131210000063,36.80920791699996],[9.96685218900012,36.810604096000105],[9.967283249000081,36.81119537300018],[9.96837997400023,36.8120918280001],[9.969388961000048,36.81303024400021],[9.970567703000055,36.813808441000205],[9.97160434700003,36.81471252500013],[9.972787857000165,36.81549072200013],[9.973820686,36.81640243500007],[9.974996566000128,36.81718826400007],[9.976016044000103,36.81811142000007],[9.977178573000101,36.81889724700008],[9.978196144,36.81981277500016],[9.980544091000032,36.821411132000065],[9.981421470000063,36.821762086000064],[9.983943940000051,36.822399141000105],[9.985946654000022,36.82315444900016],[9.987000466000085,36.823448182000035],[9.988607406000083,36.82364654700011],[9.989663123000126,36.823665620000085],[9.99066829800016,36.82359695400018],[9.99157714800013,36.82341384900022],[9.991971969000113,36.82326889100003],[9.993455886000147,36.822425842],[9.995121955999975,36.821941377000066],[9.99588585000012,36.82160949700014],[9.996854783000087,36.820793153000096],[9.99790287000012,36.820053101000056],[9.998758317000112,36.819164277000056],[9.999812126000085,36.81840896600009],[10.000776291000014,36.81753540000002],[10.00558853200001,36.81510162400018],[10.006565095000076,36.814239501000074],[10.007619857000217,36.81348800599998],[10.007774352000032,36.813316345000075]]]]}},{"type":"Feature","properties":{"GID_2":"TUN.13.7_1","GID_0":"TUN","COUNTRY":"Tunisia","GID_1":"TUN.13_1","NAME_1":"Manubah","NL_NAME_1":"NA","NAME_2":"Oued Ellil","VARNAME_2":"NA","NL_NAME_2":"NA","TYPE_2":"Delegation","ENGTYPE_2":"Delegation","CC_2":"NA","HASC_2":"TN.MN.OE"},"geometry":{"type":"MultiPolygon","coordinates":[[[[10.046298980000168,36.85589218300012],[10.04424572100019,36.853614808000074],[10.043552398000022,36.853149414000114],[10.041878700000096,36.852523804999954],[10.04113197300004,36.85212326100012],[10.040645600000031,36.851627350000214],[10.040268897000127,36.85107040400014],[10.040481567000048,36.84950637900014],[10.040740014000027,36.84870529100002],[10.041123390000129,36.8478851320002],[10.039868356000026,36.84674835200011],[10.03865241900005,36.84580612300013],[10.038127899000171,36.84518432600011],[10.037673950000093,36.8439712520001],[10.037129402000156,36.84091949400002],[10.036812783000071,36.840137481999975],[10.036575316999963,36.83979415900008],[10.034521103,36.83796691999997],[10.033307076,36.837226868000116],[10.032179833000077,36.83637237600002],[10.03076934700008,36.83564376900004],[10.029941558000067,36.83509826600012],[10.02921104400002,36.83441543600011],[10.028905869000083,36.834022523000016],[10.028479576999983,36.8331680300001],[10.028140069000225,36.83180999700009],[10.027973176000094,36.830421447000134],[10.027894020000117,36.8285865780002],[10.027994156999965,36.827293394999955],[10.028326035000068,36.82629394600022],[10.029047966000027,36.825313568000105],[10.029334067000073,36.824588776000084],[10.029843331000022,36.82147216800014],[10.030592919000048,36.818683624000165],[10.029767990000094,36.81774520800015],[10.029296875000105,36.81697082600002],[10.028853417000095,36.81558990400008],[10.028658868000074,36.81417083800008],[10.028647423000015,36.81279754600005],[10.028686523999964,36.8125267030002],[10.024748802000117,36.81336975000014],[10.021267892000052,36.813163758000066],[10.01412963900007,36.81274032600011],[10.007774352000032,36.813316345000075],[10.007619857000217,36.81348800599998],[10.006565095000076,36.814239501000074],[10.00558853200001,36.81510162400018],[10.000776291000014,36.81753540000002],[9.999812126000085,36.81840896600009],[9.998758317000112,36.819164277000056],[9.99790287000012,36.820053101000056],[9.996854783000087,36.820793153000096],[9.99588585000012,36.82160949700014],[9.995121955999975,36.821941377000066],[9.993455886000147,36.822425842],[9.991971969000113,36.82326889100003],[9.99157714800013,36.82341384900022],[9.99066829800016,36.82359695400018],[9.989663123000126,36.823665620000085],[9.988607406000083,36.82364654700011],[9.987000466000085,36.823448182000035],[9.985946654000022,36.82315444900016],[9.983943940000051,36.822399141000105],[9.981421470000063,36.821762086000064],[9.980544091000032,36.821411132000065],[9.978196144,36.81981277500016],[9.977178573000101,36.81889724700008],[9.976016044000103,36.81811142000007],[9.974996566000128,36.81718826400007],[9.973820686,36.81640243500007],[9.972787857000165,36.81549072200013],[9.97160434700003,36.81471252500013],[9.970567703000055,36.813808441000205],[9.969388961000048,36.81303024400021],[9.96837997400023,36.8120918280001],[9.967283249000081,36.81119537300018],[9.96685218900012,36.810604096000105],[9.966131210000063,36.80920791699996],[9.964339256000121,36.80762481600007],[9.9637174600001,36.80715942400011],[9.96326827900006,36.80695343000012],[9.962257386,36.806686402000054],[9.960590363000088,36.80651855400011],[9.95763397200008,36.80644989100002],[9.953416825000117,36.80643844600005],[9.95108413800011,36.8065795900001],[9.94999217900009,36.806800842000015],[9.949501991000032,36.80696869000005],[9.946707725000115,36.80828476000014],[9.946147918999982,36.80870056100017],[9.945466995000219,36.809360505000065],[9.944395065000078,36.81008911200022],[9.94342231700015,36.810894012000205],[9.942665101000204,36.81121063200002],[9.94140529700015,36.81155395500009],[9.940649032000104,36.81186676000013],[9.939672471000128,36.81266021700006],[9.938578605000126,36.81336212200004],[9.93757343200018,36.81415557900006],[9.936764717000058,36.814472199000235],[9.934847832,36.81489944400015],[9.93397140600022,36.815170287000086],[9.932059289000106,36.815994263000135],[9.930357934000112,36.816581726000074],[9.928016662000106,36.8175277700001],[9.926396371000157,36.81779861500004],[9.92410373600009,36.81788253900005],[9.90705776199995,36.817607879000064],[9.905447007,36.81771087600006],[9.904494285000032,36.817905425000085],[9.904081345000149,36.818065643000104],[9.902968406000168,36.81880569500005],[9.901180267000187,36.819629669000015],[9.898615837000014,36.82107543900018],[9.898110390000026,36.821662904000206],[9.897955894000033,36.82203292900009],[9.89778614000002,36.82326507600008],[9.897870064000037,36.825065613000014],[9.89825725500001,36.828819274],[9.89846897200003,36.83017730800019],[9.898838997,36.83142471400019],[9.899266242000094,36.8321342470001],[9.900556565,36.833339691],[9.902430535000162,36.83571243200013],[9.902886391999955,36.83652877800009],[9.903164863,36.83738327],[9.9033851630001,36.83871078499997],[9.903415678999961,36.84049224900011],[9.903299331000104,36.84136581500009],[9.902905465000023,36.8427238460001],[9.904104234000089,36.84497833400012],[9.904548645000089,36.845573425000154],[9.905655862000218,36.84647369400003],[9.906665802000115,36.84740448000022],[9.907846452000102,36.848171234000155],[9.908879280000027,36.849067688000076],[9.910061836,36.84983825699997],[9.911087989000167,36.85076522800002],[9.912247658000107,36.85163497900013],[9.915698052000133,36.8557662970001],[9.916856766,36.85663986300008],[9.917879104000027,36.85757446399996],[9.919053077000084,36.858356476],[9.92006874200001,36.85927200400008],[9.921225549000068,36.86005783100009],[9.92251968400012,36.86117935300016],[9.924575806000158,36.86254882700005],[9.925491334000148,36.862869262000096],[9.926527022000043,36.86303329500008],[9.927631379000024,36.863109589000175],[9.932314873000204,36.863132477000114],[9.933397294000057,36.86280441399997],[9.934846877,36.8619880680001],[9.935759545000023,36.86172103900012],[9.937390327000218,36.861560821000104],[9.940844536000027,36.861515046000044],[9.942480087000083,36.86141204900023],[9.94344139000013,36.861228943000086],[9.943853379000112,36.86108398400008],[9.94501209300015,36.86044693100004],[9.945413590000063,36.86030197200004],[9.946352006000081,36.86011886600008],[9.948512077000016,36.86000060999997],[9.953751563000102,36.86001968400022],[9.95489788100018,36.85995864800005],[9.956004142999964,36.85981750400019],[9.957027436000077,36.85954666200016],[9.958891869000153,36.858833313000204],[9.961708068000108,36.858089448000115],[9.962080001000151,36.85792160000008],[9.963174820000054,36.857204436999986],[9.963978767000048,36.856929779],[9.964897155,36.856788635000136],[9.965861320000203,36.856758118000094],[9.966828346000101,36.85685348500008],[9.96730327600005,36.856964111],[9.96776390000006,36.85713958900013],[9.96819400700012,36.857398986],[9.968563080000015,36.8577575680001],[9.968819619000014,36.8581504830001],[9.968997955000114,36.858570098000186],[9.969209670000046,36.859447479000124],[9.96934986100001,36.86084366000009],[9.969361305000158,36.8627319330001],[9.969176293000126,36.86404419000005],[9.96886730100014,36.86477279700003],[9.968083382000115,36.865730286000115],[9.967926025000152,36.86604690600002],[9.96774673400015,36.86677169800013],[9.96773624300008,36.86796569900007],[9.968011856000059,36.869144439000166],[9.96842098300007,36.869842529000195],[9.97020435400019,36.87146377500013],[9.970778466,36.87190246600019],[9.972806931000056,36.87321472200014],[9.973692895,36.873466491000194],[9.974160194000026,36.87351226800016],[9.975078582000075,36.873466491000194],[9.975894928000029,36.87324905399996],[9.97697830100005,36.87258529700002],[9.977377891999984,36.87242126500022],[9.978870392000017,36.87213897700004],[9.981751442,36.872028351000125],[9.984064103000135,36.87215423500006],[9.985136031,36.87232971300001],[9.986082078000036,36.87265014600015],[9.987653732000046,36.873634338999956],[9.99067688100016,36.875003816000024],[9.991737365000153,36.87532424900016],[9.992862701,36.87549972600002],[9.994017602000083,36.87559127800014],[10.00040817200002,36.875713349000115],[10.00148487000011,36.87582015899998],[10.002474786000127,36.87602615400006],[10.003255845,36.876361847000034],[10.004177093000111,36.87688827400016],[10.006758689000195,36.877719878000136],[10.007467270000026,36.87810897900009],[10.00828647599995,36.87874603400004],[10.009481430000145,36.87951278700015],[10.01050567700007,36.88042831500005],[10.011676787000157,36.88121795700002],[10.012700080000092,36.88213729800006],[10.013875008000229,36.88292694200011],[10.014905929000085,36.883842468000104],[10.016084671000092,36.884628297000106],[10.017114640000136,36.885543823],[10.018288612000104,36.88633346699997],[10.01930523000002,36.88725662299997],[10.020460129000098,36.88805389500013],[10.021466256000211,36.888969423000205],[10.023818969,36.89056778000011],[10.024772644000135,36.89090347300018],[10.026419640000073,36.89113616899998],[10.027280808000095,36.891162873000056],[10.032944679000122,36.881343842999954],[10.034852028000197,36.87803650000022],[10.039525985000031,36.868301392000134],[10.043813705999971,36.85937118600012],[10.046298980000168,36.85589218300012]]]]}},{"type":"Feature","properties":{"GID_2":"TUN.13.8_1","GID_0":"TUN","COUNTRY":"Tunisia","GID_1":"TUN.13_1","NAME_1":"Manubah","NL_NAME_1":"NA","NAME_2":"Tebourba","VARNAME_2":"NA","NL_NAME_2":"NA","TYPE_2":"Delegation","ENGTYPE_2":"Delegation","CC_2":"NA","HASC_2":"TN.MN.TE"},"geometry":{"type":"MultiPolygon","coordinates":[[[[9.826991081000036,36.968833923000176],[9.827287673999974,36.96875381400012],[9.828063011000088,36.968456268000104],[9.829461099000126,36.967510223000076],[9.83096790400001,36.966812133000225],[9.832716941000042,36.965877534000164],[9.834353448,36.96515274000015],[9.834292412000101,36.96293640100018],[9.833952904000077,36.9585762020001],[9.833980560000144,36.9572257990001],[9.834155084000107,36.95642471400008],[9.834320069,36.95607376200017],[9.835243225,36.95480346800023],[9.835723877000058,36.95341873300005],[9.836082459000151,36.95277786300014],[9.83702564300003,36.95193862900007],[9.837873458000102,36.951042175999966],[9.838912009000145,36.95029449400019],[9.83975124299995,36.94939041200017],[9.840679168999989,36.94854354900018],[9.841025353000122,36.947902679],[9.841365814000048,36.94684219400009],[9.841686249,36.94618606599998],[9.842749595999967,36.944976807000025],[9.843496322000112,36.943714143],[9.845235825000065,36.94116973900007],[9.846246720000218,36.94033050500017],[9.847105026000092,36.93942260700001],[9.848141669000066,36.93866729700014],[9.849003792000167,36.93777847300014],[9.850045204,36.93702697700004],[9.85092544500018,36.936153411000056],[9.852010728000094,36.93544387800015],[9.85300159400001,36.93467712500021],[9.855299950000108,36.93384933600011],[9.855641365000023,36.93360519399998],[9.85590267300015,36.933292390000034],[9.856185913000138,36.93254089400003],[9.856270790000144,36.931251526000196],[9.855586053000065,36.92410659900001],[9.855354309000164,36.922748566000095],[9.854922294000213,36.92152786300008],[9.854696274000075,36.92118072500004],[9.853537559000037,36.91988754400016],[9.852587700000049,36.91814422700007],[9.852063178000082,36.91759872400005],[9.85122776100006,36.91697693000012],[9.850213051000123,36.91606521700018],[9.849034309000205,36.915294647000195],[9.846966744000019,36.913463593000216],[9.846734048000128,36.913143158],[9.846405030000083,36.91241836600015],[9.845862390000127,36.91046524000011],[9.845561981000051,36.90974044900018],[9.845355988000149,36.90941619900018],[9.84420585700011,36.908107757],[9.843276024,36.90633392400005],[9.842781068000173,36.905761720000136],[9.84172916400009,36.90478897100003],[9.841033936000121,36.90387344400004],[9.838781358000082,36.90121078400009],[9.838232040000195,36.90072250400019],[9.837359429000115,36.90010070900017],[9.836365700000139,36.8991584780001],[9.835282326000117,36.89827346900015],[9.834807397000167,36.89759063700005],[9.833900452,36.89558792100017],[9.832650185000025,36.89357757600019],[9.832310677,36.89268112200009],[9.83209895999998,36.89175033600017],[9.831525803000075,36.8865509040002],[9.831114769,36.88483047600014],[9.83072853100001,36.88410568200012],[9.829832076,36.88310623300011],[9.829449653000067,36.882392884000154],[9.829197884000108,36.88157653900002],[9.828565597000106,36.87853240900004],[9.828260422,36.87775421200004],[9.82804965999996,36.87741088900006],[9.827156066000098,36.876396179000125],[9.826775550999967,36.87567520200007],[9.826526640999978,36.87485504100006],[9.826006889000139,36.872230531000156],[9.82575512000009,36.871414185000205],[9.825372695000157,36.870704652000114],[9.82447338,36.86970138499997],[9.824253082000068,36.869350433000065],[9.823937414999973,36.86854934600022],[9.823596954000136,36.866725923000075],[9.823152543000047,36.86187744100019],[9.822808264999983,36.86006164600005],[9.822487832000027,36.85926437300007],[9.822266579000106,36.85891723700022],[9.821357727000047,36.85793304400014],[9.821134566000145,36.8575859070002],[9.82080745600017,36.856788635000136],[9.82058525,36.85590744100014],[9.819892883,36.85060882500014],[9.819808959000154,36.8492279060001],[9.819872857000112,36.84836959800005],[9.820160866000139,36.847583771000224],[9.820453644000205,36.8472442630002],[9.820856095000108,36.84697723500004],[9.821805955000096,36.846687317000125],[9.822862625000129,36.84658050599999],[9.824574470000014,36.84656524600015],[9.826359749000025,36.846637727000015],[9.828151703000144,36.84679412900008],[9.829882621,36.847152711],[9.830896378000132,36.847549438999955],[9.833442688000138,36.84872055199995],[9.834684371000114,36.849525452000115],[9.835421563,36.84990310700001],[9.83837985900008,36.85069274900015],[9.840378761,36.85144805900021],[9.841476440000141,36.851757049000106],[9.843242645,36.851997375000096],[9.845647812000136,36.85210418800014],[9.847996712000151,36.85208129900011],[9.849605560000041,36.85190963800003],[9.850508690000071,36.85163497900013],[9.851643563,36.85096740699996],[9.852007865000123,36.85081863500009],[9.85367584300011,36.85037612900007],[9.854454995000184,36.85005950899998],[9.85613918400018,36.848632813000066],[9.856554031000131,36.848033905000165],[9.856755258000172,36.84725952100022],[9.856801033000052,36.846401215000164],[9.856600761,36.84410095300009],[9.856114388000082,36.841735840000155],[9.85547447300007,36.8399887080001],[9.85344791500008,36.8402786260002],[9.852332114999951,36.84030151500023],[9.85121631600009,36.84022522100004],[9.850123405000078,36.84001159600004],[9.8495998380001,36.83983993600005],[9.84692096700005,36.83865738000017],[9.846211434000052,36.83826446700008],[9.84510230900012,36.837356567],[9.843925476000093,36.836563110000085],[9.842910767000069,36.83564758400009],[9.8417539600001,36.83485412700017],[9.840745925,36.83393096900008],[9.839595794000145,36.833133699000015],[9.83859062200011,36.832218171000115],[9.83657360000011,36.83083724900017],[9.835786820000115,36.830455781000225],[9.834761620000021,36.830219270000015],[9.833063125000175,36.83007431000019],[9.825139999000088,36.83006286700013],[9.823371887999988,36.829994202000044],[9.822259904,36.82987213099998],[9.8212490090002,36.82963180500017],[9.82080745600017,36.82944107100011],[9.819673538000051,36.82863235500017],[9.818496705000113,36.827903749],[9.817685127000109,36.827289582000084],[9.816926956,36.82690429700009],[9.81539344700012,36.826580047000085],[9.812494278999962,36.826404571000225],[9.807725906000131,36.82630157400005],[9.806077958000115,36.826362609000036],[9.80508232100007,36.82654571500009],[9.80463123300005,36.826717376],[9.804235459000077,36.826980591],[9.803938864999962,36.827323914000175],[9.803648949000133,36.82811355600005],[9.803610802000085,36.82944107100011],[9.804471970000106,36.8363304140001],[9.804537773000133,36.83773422200008],[9.804449082000167,36.838596345000184],[9.804330826000152,36.838993073000054],[9.80392360700021,36.83961486800017],[9.802511216000054,36.840835572000096],[9.801783562000066,36.8412017820002],[9.800292969000102,36.84144592299997],[9.798613548000146,36.84148788500006],[9.787916184000023,36.84138870300003],[9.786307334000222,36.84121704000022],[9.785329818000077,36.84090042100022],[9.784898758000205,36.840629578000105],[9.78456306500014,36.840290069000076],[9.784154891000119,36.839527131000104],[9.78394985100003,36.83870315500005],[9.783658028000131,36.83655166700002],[9.783308983000117,36.83534622200003],[9.783109664000145,36.834995271000125],[9.782034874000123,36.83369064300009],[9.781291009000126,36.83234787000019],[9.780681610000064,36.83172226000003],[9.780248643000034,36.83147811900008],[9.779262542000067,36.83118438700002],[9.77762031500008,36.83100891200016],[9.77108669300012,36.83097839300003],[9.769387246000106,36.83106231700005],[9.768351555000121,36.831203461],[9.76746845200015,36.83146667600002],[9.766606331000139,36.831958771000146],[9.765933037000119,36.832248688000064],[9.765074729000068,36.832435609000164],[9.762726784000042,36.832740783000105],[9.76186466100003,36.83293914700008],[9.761487961000215,36.83308410700009],[9.759995461000093,36.83393096900008],[9.757912636000155,36.834537507000086],[9.756425857000151,36.83537673900007],[9.756012917000179,36.83553314200013],[9.755050659000053,36.8357315060002],[9.7528400430002,36.835849761000034],[9.743846894000042,36.83568191600009],[9.741006851000156,36.83576202400015],[9.739537240000152,36.83600997899997],[9.737594604,36.83694839500008],[9.73668098400008,36.83713912899996],[9.735655785000164,36.83723449800012],[9.732295036000094,36.83727645800004],[9.71551322900005,36.83702850400013],[9.713849069000025,36.83686447100015],[9.712853432000069,36.83665084900006],[9.710704804000015,36.835655212000106],[9.709150314000093,36.835369111000055],[9.706218719000093,36.83522796700019],[9.699501991000082,36.835208893000214],[9.697216987000024,36.83503723100013],[9.69619846400004,36.83479690700014],[9.695749283000088,36.83460998600013],[9.693389893000093,36.83306884800007],[9.692579270000168,36.832435609000164],[9.691886902,36.83205413800013],[9.689707755000077,36.831367493000165],[9.689310074000124,36.83119964600022],[9.688079834000119,36.830463409000146],[9.687240600000136,36.83014297600019],[9.685456276000115,36.82963943500009],[9.683777809999972,36.82878112800004],[9.683340072,36.8286209100002],[9.682358741000064,36.82841873300008],[9.678567886000023,36.82812118600006],[9.67753791699998,36.82797241200009],[9.676617622000128,36.82770156899998],[9.674938203,36.826850892000024],[9.672739030000022,36.826183318000034],[9.672027589000132,36.82579040500012],[9.671206473000138,36.82515716500022],[9.670012475000112,36.82438659700014],[9.668987274000107,36.823474884000206],[9.66782569900001,36.8226814270001],[9.666817665000094,36.82175445600005],[9.665662766000017,36.820953370000026],[9.66466045400004,36.82003784300004],[9.662648202000168,36.81865310800013],[9.661872863000143,36.818271637000095],[9.660339356000092,36.81797027600012],[9.658646584000097,36.81787109400008],[9.644908906000039,36.817821504000065],[9.64318657,36.81775283800007],[9.642099381000014,36.817638398000014],[9.641101837000166,36.817401887000166],[9.64033412900015,36.817016601],[9.638358116,36.81562042300011],[9.637099265000016,36.814498901000135],[9.63538646700014,36.81331253000012],[9.634602548000116,36.81293487500013],[9.633584022999953,36.812713624000125],[9.632472993000041,36.812614442],[9.628405570000032,36.81254577700018],[9.627301215999962,36.81246185300007],[9.626276970000125,36.812255860000086],[9.625814438000047,36.812076569000084],[9.625172616000144,36.81166839600006],[9.623819350000174,36.81062316900009],[9.623307228000078,36.81000137300006],[9.623124123000116,36.80961227400011],[9.622890472000146,36.808776855],[9.622758865000092,36.807884216000126],[9.622491836000203,36.804115296000035],[9.622298241,36.80275344800007],[9.621868134000112,36.80153274600005],[9.621368408000064,36.800918579000125],[9.619582176000153,36.799354553000036],[9.617209435000118,36.797813415999975],[9.616330147000019,36.79748535100019],[9.613800048000021,36.79689407300012],[9.611294746000032,36.79590988200013],[9.609481811000043,36.79528427100006],[9.605530738000068,36.7934684750001],[9.604866027000048,36.79415893500003],[9.604771615000052,36.79431915300014],[9.60010719400003,36.80220031699995],[9.598316193000167,36.810630799000094],[9.594858170000043,36.81610870400019],[9.589346885000205,36.81483078100015],[9.582898140000074,36.81184768700015],[9.582793235000098,36.811798096000224],[9.578307152,36.813808441000205],[9.577672005000116,36.816459655000095],[9.577195168000097,36.8184509280001],[9.578418732000083,36.822959900000136],[9.580055237000218,36.82884979300022],[9.577484131000025,36.830718993000154],[9.572773933000034,36.83409881600002],[9.572133063000122,36.834777833000075],[9.57195377400012,36.834964752000175],[9.56696605600017,36.84022903400009],[9.559878349000106,36.846870423000084],[9.557472228999975,36.85104370100006],[9.556731224000126,36.85232925400011],[9.559239387000085,36.85508346500009],[9.56476116200008,36.86114501900007],[9.565029145000137,36.861438750000126],[9.566587448000108,36.8632965100001],[9.568236351000204,36.86526489200007],[9.571326255000068,36.86894989000005],[9.579113959999964,36.87630844199997],[9.583541870000134,36.87982177700023],[9.594559669000125,36.88378143200011],[9.606682777000087,36.88376998900006],[9.61541175900006,36.88285064600011],[9.617711067000057,36.87826156600019],[9.619106292000124,36.875480653000224],[9.622546196,36.87277984700013],[9.632794380999988,36.88296127400011],[9.632962226000108,36.883129119000145],[9.633273125000164,36.88343811100013],[9.635800362000102,36.88559723000007],[9.64930152900022,36.89712906000014],[9.665454864000045,36.89854812700005],[9.669694900000126,36.899581910000144],[9.67818832299997,36.90164947500015],[9.682955741000077,36.90505218600005],[9.683874129000037,36.90570831199998],[9.68558406900012,36.906929017],[9.690478326000152,36.91067505000015],[9.693611145000192,36.91307067900012],[9.703612327,36.91302871800011],[9.71642112700003,36.908359529000144],[9.731508254000099,36.910278321],[9.740832328000105,36.91471099900022],[9.745070457000205,36.91813659700015],[9.74886035899999,36.92119979800011],[9.75177669599997,36.9286613470002],[9.752411843000031,36.93024826000014],[9.755525589000092,36.938030244000096],[9.760987282,36.9465599060001],[9.761762619000114,36.94714736900003],[9.768307686000222,36.952110291000146],[9.770928383000166,36.95410156200015],[9.777261734999987,36.9603881840001],[9.777288437000065,36.96059799199996],[9.777883529000098,36.965454101999946],[9.778260232000092,36.96852111800005],[9.779536247000065,36.97351837199999],[9.780116081000168,36.975788116000025],[9.788368226000122,36.982101441999966],[9.791374207000148,36.980571748000145],[9.791801452000149,36.980354310000095],[9.795523643000015,36.97845459100021],[9.802908897,36.974689484000166],[9.81253623999997,36.96892929200007],[9.826991081000036,36.968833923000176]]]]}}]};
+
+/* ═══════════════════════════════════════════════════════
+   DELEGATION DATA + TRANSITION MATRICES
+═══════════════════════════════════════════════════════ */
+const META = {
+  "Borj El Amri": {id:"borj",   col:"#BC8CFF",lat:36.73216,lng:9.84099, z:12,area:290,
+    desc:"Mixed agricultural and residential zone with seasonal wadi vegetation.",
+    lulc:{urban:18,veg:42,water:6,bare:34},
+    T:[[0.82,0.05,0.02,0.11],[0.12,0.74,0.03,0.11],[0.04,0.06,0.81,0.09],[0.18,0.15,0.04,0.63]]},
+  "Douar Hicher": {id:"douar",  col:"#FF7B72",lat:36.84748,lng:10.04758,z:14,area:22,
+    desc:"Densest periurban suburb adjacent to Tunis — highest urbanization rate in the governorate.",
+    lulc:{urban:72,veg:14,water:2,bare:12},
+    T:[[0.92,0.02,0.01,0.05],[0.38,0.48,0.02,0.12],[0.10,0.05,0.78,0.07],[0.35,0.08,0.02,0.55]]},
+  "El Battan":    {id:"battan", col:"#E3B341",lat:36.80457,lng:9.76761, z:12,area:299,
+    desc:"Large rural zone with extensive bare soil exposure and moderate agricultural activity.",
+    lulc:{urban:10,veg:38,water:4,bare:48},
+    T:[[0.78,0.07,0.02,0.13],[0.09,0.71,0.04,0.16],[0.03,0.07,0.80,0.10],[0.11,0.14,0.03,0.72]]},
+  "Jedaida":      {id:"jedaida",col:"#58A6FF",lat:36.87500,lng:9.87901, z:12,area:340,
+    desc:"Fertile Medjerda river lowlands — agricultural heartland with rapid urban growth pressure.",
+    lulc:{urban:32,veg:40,water:8,bare:20},
+    T:[[0.85,0.05,0.02,0.08],[0.14,0.73,0.05,0.08],[0.05,0.08,0.79,0.08],[0.20,0.18,0.05,0.57]]},
+  "Manouba":      {id:"manouba",col:"#2ECC71",lat:36.83174,lng:10.04214,z:14,area:22,
+    desc:"Administrative capital — dense urban core with limited green space and high sealing.",
+    lulc:{urban:58,veg:22,water:4,bare:16},
+    T:[[0.90,0.03,0.01,0.06],[0.30,0.55,0.02,0.13],[0.08,0.05,0.80,0.07],[0.28,0.10,0.02,0.60]]},
+  "Mornaguia":    {id:"morn",   col:"#D29922",lat:36.75155,lng:9.90539, z:11,area:670,
+    desc:"Largest delegation — diverse dryland farming, olive groves and degraded terrain.",
+    lulc:{urban:20,veg:35,water:5,bare:40},
+    T:[[0.80,0.06,0.02,0.12],[0.10,0.72,0.04,0.14],[0.04,0.07,0.78,0.11],[0.14,0.13,0.03,0.70]]},
+  "Oued Ellil":   {id:"ellil",  col:"#FFA657",lat:36.84356,lng:9.97395, z:13,area:143,
+    desc:"Rapidly urbanizing corridor bordering Tunis — major residential expansion zone.",
+    lulc:{urban:55,veg:20,water:3,bare:22},
+    T:[[0.88,0.04,0.01,0.07],[0.32,0.52,0.02,0.14],[0.07,0.06,0.79,0.08],[0.30,0.10,0.02,0.58]]},
+  "Tebourba":     {id:"tebourba",col:"#7EE787",lat:36.86571,lng:9.75760,z:12,area:642,
+    desc:"Most vegetated delegation — Medjerda riparian zone, cereal and olive cultivation.",
+    lulc:{urban:16,veg:48,water:9,bare:27},
+    T:[[0.79,0.07,0.03,0.11],[0.08,0.77,0.06,0.09],[0.03,0.09,0.82,0.06],[0.12,0.18,0.05,0.65]]},
+};
+
+const CLS=['urban','veg','water','bare'];
+const CC={urban:'#E05252',veg:'#2ECC71',water:'#3B9EFF',bare:'#D4A017'};
+const CL={urban:'Urban',veg:'Vegetation',water:'Water',bare:'Bare Soil'};
+const CI={urban:'🏙',veg:'🌿',water:'💧',bare:'🏜'};
+
+const IVS={
+  dam:   {n:'Dam / Reservoir',  ico:'🏞',col:'#1a4f8a',veg:+4, water:+18,urban:0,  bare:-8,  env:+9,
+    desc:'Impounds seasonal runoff, raises the water table, enables downstream irrigation.'},
+  agri:  {n:'Agricultural Zone',ico:'🌾',col:'#2a5a20',veg:+14,water:+2, urban:0,  bare:-16, env:+6,
+    desc:'Converts degraded bare land to managed cropland, increasing vegetation cover.'},
+  forest:{n:'Reforestation',    ico:'🌳',col:'#1a4020',veg:+20,water:+3, urban:0,  bare:-13, env:+15,
+    desc:'Restores native canopy, sequesters carbon, stabilises soil and microclimate.'},
+  res:   {n:'Residential Zone', ico:'🏘',col:'#7a2020',veg:-14,water:-2, urban:+20,bare:-4,  env:-12,
+    desc:'Converts natural or agricultural land to sealed residential surface.'},
+  solar: {n:'Solar Farm',       ico:'☀', col:'#7a5a00',veg:-3, water:0,  urban:+6, bare:-12, env:+7,
+    desc:'Deploys photovoltaic arrays on degraded bare land for renewable energy.'},
+  ind:   {n:'Industrial Zone',  ico:'🏭',col:'#4a2a6a',veg:-18,water:-3, urban:+22,bare:-1,  env:-16,
+    desc:'Large-footprint industrial infrastructure — heavy ecological impact on all classes.'},
+};
+
+/* ═══════════════════════════════════════════════════════
+   CA-MARKOV ENGINE
+   Identical math to Python server.py
+   Replace T matrices with your real values from TerrSet
+═══════════════════════════════════════════════════════ */
+function caMarkov(lulc, T, steps){
+  let s = CLS.map(c=>lulc[c]/100);
+  const traj=[{year:2025,...Object.fromEntries(CLS.map((c,i)=>[c,s[i]*100]))}];
+  for(let t=0;t<steps;t++){
+    const ns=[0,0,0,0];
+    for(let i=0;i<4;i++) for(let j=0;j<4;j++) ns[j]+=s[i]*T[i][j];
+    const noise=ns.map(v=>v+(Math.random()-.5)*0.003);
+    const tot=noise.reduce((a,b)=>a+b,0);
+    s=noise.map(v=>Math.max(0,v)/tot);
+    traj.push({year:2025+t+1,...Object.fromEntries(CLS.map((c,i)=>[c,s[i]*100]))});
+  }
+  return traj; // returns full trajectory including year 0
+}
+
+/* ═══════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════ */
+let map, selDel=null, activeIv=null, delState={}, totalActs=0;
+let placedInterventions={};  // {delegation: ['forest','dam',...]}
+let donutC=null, trajC=null;
+let leftOpen=true, rpOpen=false;
+let delLayers={}, markers=[], walkMode=false, walkKeys={}, walkIv=null;
+let predTrajectory=null, predSource='js', predYear=2035;
+
+function getState(n){if(!delState[n])delState[n]={...META[n].lulc};return delState[n];}
+function normState(st){CLS.forEach(k=>st[k]=Math.max(0,st[k]));const tot=CLS.reduce((s,k)=>s+st[k],0);if(tot>0)CLS.forEach(k=>st[k]=st[k]/tot*100);return st;}
+function envScore(st){return Math.max(0,Math.min(100,Math.round(st.veg*.5+st.water*.28-st.urban*.22-st.bare*.12+34)));}
+function domCol(st){return CC[Object.entries(st).sort((a,b)=>b[1]-a[1])[0][0]];}
+
+/* ═══════════════════════════════════════════════════════
+   LEAFLET MAP
+═══════════════════════════════════════════════════════ */
+const TILES={
+  sat:   L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{attribution:"Esri",maxZoom:19}),
+  street:L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"© OpenStreetMap",maxZoom:19}),
+  topo:  L.tileLayer("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",{attribution:"© OpenTopoMap",maxZoom:17}),
+};
+let activeTile='sat';
+
+window.addEventListener('DOMContentLoaded',()=>{
+  map=L.map('map',{zoomControl:false,preferCanvas:true}).setView([36.80,9.88],11);
+  TILES.sat.addTo(map);
+  L.control.zoom({position:'bottomleft'}).addTo(map);
+
+  L.geoJSON(GJ,{
+    style:feat=>{
+      const n=feat.properties.NAME_2,st=getState(n);
+      return{fillColor:domCol(st),fillOpacity:.42,color:META[n]?.col||'#888',weight:2,opacity:.85};
+    },
+    onEachFeature:(feat,layer)=>{
+      const n=feat.properties.NAME_2; delLayers[n]=layer;
+      layer.on('click',e=>{if(activeIv){placeIv(e.latlng);return;}selectDel(n);});
+      layer.on('mouseover',e=>{
+        if(activeIv){map.getContainer().style.cursor='crosshair';return;}
+        const st=getState(n); layer.setStyle({fillOpacity:.62,weight:3});
+        const tt=document.getElementById('tt');
+        tt.style.display='block';
+        tt.style.left=(e.originalEvent.clientX+16)+'px';
+        tt.style.top=(e.originalEvent.clientY+8)+'px';
+        tt.innerHTML=`<div class="tt-n">${n}</div>
+          <div class="tt-r"><span class="tt-l">Area</span><span class="tt-v">${META[n].area} km²</span></div>
+          <div class="tt-r"><span class="tt-l" style="color:var(--veg)">🌿 Veg</span><span class="tt-v">${st.veg.toFixed(1)}%</span></div>
+          <div class="tt-r"><span class="tt-l" style="color:var(--urban)">🏙 Urban</span><span class="tt-v">${st.urban.toFixed(1)}%</span></div>
+          <div class="tt-r"><span class="tt-l" style="color:var(--water)">💧 Water</span><span class="tt-v">${st.water.toFixed(1)}%</span></div>`;
+        map.getContainer().style.cursor='pointer';
+      });
+      layer.on('mouseout',()=>{refreshStyle(n);document.getElementById('tt').style.display='none';map.getContainer().style.cursor=activeIv?'crosshair':'';});
+      layer.on('mousemove',e=>{const tt=document.getElementById('tt');tt.style.left=(e.originalEvent.clientX+16)+'px';tt.style.top=(e.originalEvent.clientY+8)+'px';});
+    }
+  }).addTo(map);
+
+  buildDelList(); initDonut(); drawEnvRing(null);
+  document.addEventListener('keydown',e=>{walkKeys[e.key]=true;if(walkMode&&['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'].includes(e.key))e.preventDefault();});
+  document.addEventListener('keyup',e=>{delete walkKeys[e.key];});
+});
+
+function refreshStyle(n){
+  const l=delLayers[n]; if(!l)return;
+  const st=getState(n);
+  l.setStyle({fillColor:domCol(st),fillOpacity:n===selDel?.58:.42,color:META[n]?.col||'#888',weight:n===selDel?3:2,opacity:.85});
+}
+
+function setLayer(k){
+  if(k===activeTile)return;
+  map.removeLayer(TILES[activeTile]);TILES[k].addTo(map);activeTile=k;
+  document.querySelectorAll('.tv').forEach(b=>b.classList.remove('active'));
+  document.getElementById('m-'+k)?.classList.add('active');
+}
+
+/* ═══════════════════════════════════════════════════════
+   DELEGATION SELECTION
+═══════════════════════════════════════════════════════ */
+async function selectDel(n){
+  const prev=selDel; selDel=n;
+  if(prev)refreshStyle(prev); refreshStyle(n);
+  document.querySelectorAll('.dc').forEach(c=>c.classList.remove('active'));
+  document.getElementById('dc-'+META[n].id)?.classList.add('active');
+  map.flyTo([META[n].lat,META[n].lng],META[n].z,{duration:1.5,easeLinearity:.4});
+  document.getElementById('rp-nm').textContent=n+' Delegation';
+  document.getElementById('rp-sb').textContent=META[n].desc+' · '+META[n].area+' km²';
+  document.getElementById('tb-st').textContent='Loading '+n+'…';
+  document.getElementById('ab').disabled=(activeIv===null);
+  document.getElementById('pb').disabled=false;
+
+  // ── Fetch real 2025 LULC from server ──
+  try {
+    const r = await Promise.race([
+      fetch('http://localhost:5000/api/lulc/'+encodeURIComponent(n)),
+      new Promise((_,rej)=>setTimeout(()=>rej('timeout'),1500))
+    ]);
+    const data = await r.json();
+    if(data.lulc){
+      // server returns {water,builtup,veg,bare} — map builtup→urban for game
+      delState[n] = {
+        urban: data.lulc.builtup,
+        veg:   data.lulc.veg,
+        water: data.lulc.water,
+        bare:  data.lulc.bare,
+      };
+      document.getElementById('tb-st').textContent='Viewing: '+n+' (real data)';
+      console.log('✓ Real LULC loaded for '+n, delState[n]);
+    }
+  } catch(e) {
+    // fallback to META values if server not running
+    if(!delState[n]) delState[n]={...META[n].lulc};
+    document.getElementById('tb-st').textContent='Viewing: '+n;
+  }
+
+  buildLCCards(); updateEnv(); updateDonut(); updateTopbar();
+  if(!rpOpen) openRp();
+}
+
+/* ═══════════════════════════════════════════════════════
+   PANEL CONTROLS
+═══════════════════════════════════════════════════════ */
+function togL(){
+  leftOpen=!leftOpen;
+  document.getElementById('lp').classList.toggle('off',!leftOpen);
+  const b=document.getElementById('ptb-l');
+  b.style.left=leftOpen?'252px':'0'; b.textContent=leftOpen?'◀':'▶';
+  setTimeout(()=>map.invalidateSize(),310);
+}
+function openRp(){
+  rpOpen=true;
+  document.getElementById('rp').classList.add('open');
+  document.getElementById('open-rp-btn').style.display='none';
+  document.getElementById('bot').classList.add('rp-open');
+  setTimeout(()=>map.invalidateSize(),310);
+}
+function closeRp(){
+  rpOpen=false;
+  document.getElementById('rp').classList.remove('open');
+  document.getElementById('open-rp-btn').style.display='flex';
+  document.getElementById('bot').classList.remove('rp-open');
+  setTimeout(()=>map.invalidateSize(),310);
+}
+function rpTab(t){
+  document.querySelectorAll('.rp-page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.rp-nb').forEach(b=>b.classList.remove('active'));
+  document.getElementById('rt-'+t).classList.add('active');
+  document.getElementById('rn-'+t).classList.add('active');
+}
+
+/* ═══════════════════════════════════════════════════════
+   DELEGATION LIST
+═══════════════════════════════════════════════════════ */
+function buildDelList(){
+  const el=document.getElementById('del-list'); el.innerHTML='';
+  Object.entries(META).forEach(([n,m])=>{
+    const st=getState(n);
+    const d=document.createElement('div'); d.className='dc'; d.id='dc-'+m.id; d.onclick=()=>selectDel(n);
+    d.innerHTML=`<div class="dc-top"><div class="dc-nm"><div class="dc-dot" style="background:${m.col}"></div>${n}</div><div class="dc-area">${m.area}km²</div></div>
+      <div class="dc-bar" id="dlb-${m.id}">
+        <div class="dcb" style="width:${st.urban}%;background:var(--urban)"></div>
+        <div class="dcb" style="width:${st.veg}%;background:var(--veg)"></div>
+        <div class="dcb" style="width:${st.water}%;background:var(--water)"></div>
+        <div class="dcb" style="width:${st.bare}%;background:var(--bare)"></div>
+      </div>`;
+    el.appendChild(d);
+  });
+}
+function refreshBar(n){
+  const m=META[n],st=getState(n),bar=document.getElementById('dlb-'+m.id);
+  if(bar)bar.innerHTML=`<div class="dcb" style="width:${st.urban}%;background:var(--urban)"></div><div class="dcb" style="width:${st.veg}%;background:var(--veg)"></div><div class="dcb" style="width:${st.water}%;background:var(--water)"></div><div class="dcb" style="width:${st.bare}%;background:var(--bare)"></div>`;
+}
+
+/* ═══════════════════════════════════════════════════════
+   LULC CARDS
+═══════════════════════════════════════════════════════ */
+function buildLCCards(){
+  if(!selDel)return;
+  const m=META[selDel],base=m.lulc,st=getState(selDel),g=document.getElementById('lc-grid');
+  g.innerHTML='';
+  CLS.forEach(cls=>{
+    const v=st[cls],bv=base[cls],diff=v-bv;
+    const pct=(v/CLS.reduce((s,k)=>s+st[k],0)*100).toFixed(1);
+    const bc=Math.abs(diff)<.05?'neu':diff>0?'pos':'neg';
+    const bt=Math.abs(diff)<.05?'Baseline':(diff>0?'▲':'▼')+Math.abs(diff).toFixed(1)+'%';
+    const c=document.createElement('div'); c.className=`lc ${cls}`;
+    c.innerHTML=`<div class="lc-top"><div class="lc-ico">${CI[cls]}</div><div class="lc-bdg ${bc}">${bt}</div></div>
+      <div class="lc-lbl">${CL[cls]}</div><div class="lc-val">${v.toFixed(1)}%</div>
+      <div class="lc-km">${(m.area*v/100).toFixed(1)} km²</div>
+      <div class="lc-bar"><div class="lc-bf" style="background:var(--${cls});width:${pct}%"></div></div>`;
+    g.appendChild(c);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════
+   ENV INDEX
+═══════════════════════════════════════════════════════ */
+function updateEnv(){
+  if(!selDel)return;
+  const st=getState(selDel),s=envScore(st);
+  const col=s>65?'#2ECC71':s>40?'#F0A500':'#E84040';
+  document.getElementById('en').textContent=s;
+  document.getElementById('en').style.color=col;
+  document.getElementById('ts-env').textContent=s+'/100';
+  document.getElementById('ts-veg').textContent=st.veg.toFixed(1)+'%';
+  drawEnvRing(s);
+  const k2={veg:'v',water:'w',urban:'u',bare:'b'};
+  CLS.forEach(k=>{
+    document.getElementById('ef-'+k2[k]).style.width=st[k]+'%';
+    document.getElementById('ev-'+k2[k]).textContent=st[k].toFixed(0)+'%';
+  });
+}
+function drawEnvRing(score){
+  const cv=document.getElementById('ec'),ctx=cv.getContext('2d');
+  const cx=38,cy=38,r=30,lw=6.5;
+  ctx.clearRect(0,0,76,76);
+  ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.strokeStyle='rgba(255,255,255,.06)';ctx.lineWidth=lw;ctx.stroke();
+  if(score===null)return;
+  const col=score>65?'#2ECC71':score>40?'#F0A500':'#E84040';
+  const grad=ctx.createLinearGradient(0,0,76,76);
+  grad.addColorStop(0,col+'CC');grad.addColorStop(1,col);
+  ctx.beginPath();ctx.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+(score/100)*Math.PI*2);
+  ctx.strokeStyle=grad;ctx.lineWidth=lw;ctx.lineCap='round';ctx.stroke();
+}
+
+/* ═══════════════════════════════════════════════════════
+   DONUT CHART
+═══════════════════════════════════════════════════════ */
+function initDonut(){
+  donutC=new Chart(document.getElementById('dnut').getContext('2d'),{
+    type:'doughnut',
+    data:{labels:['Urban','Vegetation','Water','Bare Soil'],
+      datasets:[{data:[25,40,5,30],backgroundColor:['#E05252','#2ECC71','#3B9EFF','#D4A017'],borderWidth:0,hoverOffset:6}]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'70%',
+      plugins:{legend:{position:'bottom',labels:{color:'#7D8FA3',font:{family:'Outfit',size:9.5},padding:7,boxWidth:8,boxHeight:8}}},
+      animation:{duration:500}}
+  });
+}
+function updateDonut(){
+  if(!selDel||!donutC)return;
+  donutC.data.datasets[0].data=CLS.map(c=>getState(selDel)[c]);
+  donutC.update();
+}
+
+/* ═══════════════════════════════════════════════════════
+   INTERVENTIONS
+═══════════════════════════════════════════════════════ */
+function selIv(key,btn){
+  activeIv=(activeIv===key)?null:key;
+  document.querySelectorAll('.ib').forEach(b=>b.classList.remove('on'));
+  const ch=document.getElementById('ch');
+  if(activeIv){btn.classList.add('on');ch.style.display='block';map.getContainer().style.cursor='crosshair';}
+  else{ch.style.display='none';map.getContainer().style.cursor='';}
+  document.getElementById('ab').disabled=(!activeIv||!selDel);
+}
+function placeIv(latlng){
+  if(!activeIv||!selDel)return;
+  const iv=IVS[activeIv];
+  addMarker(activeIv,latlng,iv); applyEffect(activeIv);
+  showOpop(latlng,iv); logAction(activeIv,iv); totalActs++;
+  updateTopbar(); notify(`${iv.ico} ${iv.n} placed at ${latlng.lat.toFixed(4)}°N`);
+}
+function addMarker(type,latlng,iv){
+  const el=document.createElement('div'); el.className='iv-marker'; el.style.background=iv.col;
+  el.innerHTML=iv.ico; el.title=iv.n;
+  const icon=L.divIcon({html:el,iconSize:[36,36],iconAnchor:[18,18],className:''});
+  const mk=L.marker(latlng,{icon}).addTo(map);
+  mk.bindPopup(`<b>${iv.ico} ${iv.n}</b><br><span style="color:var(--ink2);font-size:.75rem">${iv.desc}</span>`);
+  markers.push(mk); refreshStyle(selDel);
+}
+function applyEffect(key){
+  if(!selDel)return;
+  const iv=IVS[key],st=getState(selDel);
+  st.urban+=iv.urban;st.veg+=iv.veg;st.water+=iv.water;st.bare+=iv.bare;
+  normState(st); delState[selDel]=st;
+  // track for server
+  if(!placedInterventions[selDel]) placedInterventions[selDel]=[];
+  placedInterventions[selDel].push(key);
+  refreshStyle(selDel); refreshBar(selDel);
+  buildLCCards(); updateEnv(); updateDonut(); updateTopbar();
+}
+function applyWhole(){
+  if(!activeIv||!selDel)return;
+  const m=META[selDel]; placeIv(L.latLng(m.lat,m.lng));
+}
+function resetDel(){
+  if(!selDel)return;
+  delState[selDel]={...META[selDel].lulc};
+  placedInterventions[selDel]=[];
+  markers.forEach(mk=>map.removeLayer(mk)); markers=[];
+  refreshStyle(selDel); refreshBar(selDel);
+  buildLCCards(); updateEnv(); updateDonut(); updateTopbar();
+  document.getElementById('pred-content').style.display='none';
+  document.getElementById('pred-tabs').style.display='none';
+  notify('↺ '+selDel+' reset to 2025 baseline');
+  logAction('reset',{ico:'↺',n:'Reset'},'reset');
+}
+
+/* ═══════════════════════════════════════════════════════
+   CA-MARKOV PREDICTION — full trajectory, 3 year snapshots
+═══════════════════════════════════════════════════════ */
+async function runPred(){
+  if(!selDel)return;
+  const m=META[selDel], st=getState(selDel);
+  const btn=document.getElementById('pb');
+  btn.textContent='⏳ Running model…'; btn.disabled=true;
+
+  let traj=null, src='js';
+
+  try{
+    // Collect active interventions from the log (what user placed)
+    const activeInterventions = placedInterventions[selDel] || [];
+
+    // Server v2: just send delegation + interventions
+    // Server reads real 2025 LULC from GeoJSON automatically
+    const r=await Promise.race([
+      fetch('http://localhost:5000/api/predict',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          delegation:    selDel,
+          interventions: activeInterventions,
+          steps:         10,
+          return_geojson:false
+        })
+      }),
+      new Promise((_,rej)=>setTimeout(()=>rej('timeout'),3000))
+    ]);
+    const data=await r.json();
+    if(data.annual_trajectory){
+      // translate builtup→urban for game display
+      const translated=data.annual_trajectory.map(row=>({
+        year:  row.year,
+        urban: row.builtup,
+        veg:   row.veg,
+        water: row.water,
+        bare:  row.bare,
+      }));
+      traj=[{year:2025,...st},...translated];
+      src = data.lulc_source==='geojson' ? 'py-real' : 'py';
+    }
+  }catch(e){ console.warn('Server not available, using JS fallback'); }
+
+  if(!traj){ traj=caMarkov(st,m.T,10); src='js'; }
+
+  predTrajectory=traj; predSource=src;
+  btn.textContent='🔮 Re-run Markov Prediction'; btn.disabled=false;
+
+  document.getElementById('pred-tabs').style.display='flex';
+  document.getElementById('pred-content').style.display='block';
+
+  buildTrajChart(traj);
+  showPredYear(2035);
+
+  rpTab('pred');
+  notify('🔮 Markov complete — 3 scenarios ready (2030 · 2033 · 2035)');
+}
+
+function showPredYear(yr){
+  predYear=yr;
+  document.querySelectorAll('.pred-tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('pt-'+yr)?.classList.add('active');
+  if(!predTrajectory)return;
+
+  const snap=predTrajectory.find(t=>t.year===yr)||predTrajectory[predTrajectory.length-1];
+  const base=META[selDel].lulc;
+  const area=META[selDel].area;
+
+  document.getElementById('pyear').textContent=yr;
+  document.getElementById('psrc').className='pred-src '+(predSource==='py-real'?'py':predSource);
+  const srcLabel={
+    'py-real': '🐍 Real GeoJSON data',
+    'py':      '🐍 Python (fallback data)',
+    'js':      '🌐 Browser fallback'
+  };
+  document.getElementById('psrc').textContent=srcLabel[predSource]||predSource;
+
+  // Class cards
+  const cards=document.getElementById('pred-cards'); cards.innerHTML='';
+  CLS.forEach(cls=>{
+    const v=snap[cls],bv=base[cls],diff=v-bv;
+    const pct=(v/CLS.reduce((s,k)=>s+(snap[k]||0),0)*100).toFixed(1);
+    const bc=Math.abs(diff)<.1?'neu':diff>0?'pos':'neg';
+    const bt=Math.abs(diff)<.1?'Stable':(diff>0?'▲+':'▼')+Math.abs(diff).toFixed(1)+'%';
+    const card=document.createElement('div'); card.className=`pc-card ${cls}`;
+    card.innerHTML=`<div class="pcc-top"><div class="pcc-ico">${CI[cls]}</div><div class="pcc-delta ${bc}">${bt}</div></div>
+      <div class="pcc-lbl">${CL[cls]}</div><div class="pcc-val">${v.toFixed(1)}%</div>
+      <div class="pcc-km">${(area*v/100).toFixed(1)} km²</div>
+      <div class="pcc-prog"><div class="pcc-prog-f" style="background:${CC[cls]};width:${pct}%"></div></div>`;
+    cards.appendChild(card);
+  });
+
+  // Comparison bars
+  const compRows=document.getElementById('comp-rows'); compRows.innerHTML='';
+  CLS.forEach(cls=>{
+    const bv=base[cls], pv=snap[cls];
+    compRows.innerHTML+=`<div class="comp-row">
+      <div class="comp-lbl"><div class="comp-dot" style="background:${CC[cls]}"></div>${CL[cls]}</div>
+      <div class="comp-bars">
+        <div class="comp-bar-row"><span class="comp-bar-year">2025</span><div class="comp-bar-bg"><div class="comp-bar-fill" style="width:${bv}%;background:${CC[cls]}88"></div></div><span class="comp-bar-val">${bv.toFixed(0)}%</span></div>
+        <div class="comp-bar-row"><span class="comp-bar-year">${yr}</span><div class="comp-bar-bg"><div class="comp-bar-fill" style="width:${pv.toFixed(0)}%;background:${CC[cls]}"></div></div><span class="comp-bar-val">${pv.toFixed(1)}%</span></div>
+      </div>
+    </div>`;
+  });
+
+  // AI Insight
+  const ud=snap.urban-base.urban, vd=snap.veg-base.veg, wd=snap.water-base.water;
+  const envNow=envScore(base), envPred=envScore({urban:snap.urban,veg:snap.veg,water:snap.water,bare:snap.bare});
+  const envDelta=envPred-envNow;
+  const scenarios={
+    urban_expansion:{
+      title:'Urban Expansion Scenario',
+      text:`By ${yr}, urban surfaces in <b>${selDel}</b> are projected to expand by <b>${ud.toFixed(1)} percentage points</b>, driven by continued periurban growth pressure from Greater Tunis. This represents an estimated <b>${(META[selDel].area*ud/100).toFixed(1)} km²</b> of new sealed surface — primarily converted from agricultural and bare land. Vegetation connectivity will decline and surface impermeability will intensify flash flood risk.`,
+    },
+    veg_recovery:{
+      title:'Vegetation Recovery Scenario',
+      text:`Applied interventions produce a measurable reversal of vegetation decline. By ${yr}, green cover in <b>${selDel}</b> is projected to increase by <b>${vd.toFixed(1)}%</b>, corresponding to approximately <b>${(META[selDel].area*vd/100).toFixed(1)} km²</b> of restored or expanded canopy and cropland. Soil stabilisation, carbon sequestration and cooling effects are projected to improve significantly.`,
+    },
+    veg_loss:{
+      title:'Vegetation Decline Scenario',
+      text:`Without intervention, vegetation in <b>${selDel}</b> is projected to contract by <b>${Math.abs(vd).toFixed(1)}%</b> by ${yr}, losing approximately <b>${(META[selDel].area*Math.abs(vd)/100).toFixed(1)} km²</b> of green cover. This accelerates erosion, reduces the evapotranspiration-driven cooling effect, and reduces biodiversity corridor connectivity in the Medjerda basin.`,
+    },
+    stable:{
+      title:'Stable Trajectory',
+      text:`Land cover in <b>${selDel}</b> is projected to remain relatively stable through ${yr}, with no class changing by more than 5 percentage points. The current balance of urban, vegetation, water and bare surfaces is likely to persist under the observed transition dynamics, though continued monitoring is recommended given broader regional urbanization pressure.`,
+    },
+  };
+  const key=ud>5?'urban_expansion':vd>5?'veg_recovery':vd<-5?'veg_loss':'stable';
+  const sc=scenarios[key];
+  document.getElementById('insight-text').innerHTML=sc.text;
+  const isrcLabel={
+    'py-real':'Source: Python CA-Markov · Real 2025 GeoJSON data',
+    'py':     'Source: Python CA-Markov · Fallback data',
+    'js':     'Source: Browser CA-Markov engine'
+  };
+  document.getElementById('isrc').textContent=isrcLabel[predSource]||'Source: CA-Markov';
+
+  const mets=document.getElementById('insight-metrics'); mets.innerHTML='';
+  const mdata=[
+    {v:(envDelta>0?'+':'')+envDelta,l:'Env Score Δ',cls:envDelta>0?'pos':'neg'},
+    {v:(ud>0?'+':'')+ud.toFixed(1)+'%',l:'Urban Change',cls:ud>0?'neg':'pos'},
+    {v:(vd>0?'+':'')+vd.toFixed(1)+'%',l:'Veg Change',cls:vd>0?'pos':'neg'},
+    {v:(wd>0?'+':'')+wd.toFixed(1)+'%',l:'Water Change',cls:wd>0?'pos':wd<0?'neg':'neu'},
+  ];
+  mdata.forEach(d=>{mets.innerHTML+=`<div class="im ${d.cls}"><div class="im-v">${d.v}</div><div class="im-l">${d.l}</div></div>`;});
+
+  // Update map prediction fill
+  updatePredFill({urban:snap.urban,veg:snap.veg,water:snap.water,bare:snap.bare});
+}
+
+function buildTrajChart(traj){
+  const ctx=document.getElementById('traj-chart').getContext('2d');
+  if(trajC){trajC.destroy();trajC=null;}
+  const labels=traj.map(t=>t.year);
+  trajC=new Chart(ctx,{
+    type:'line',
+    data:{labels,datasets:CLS.map(cls=>({
+      label:CL[cls], data:traj.map(t=>+t[cls].toFixed(2)),
+      borderColor:CC[cls], backgroundColor:CC[cls]+'18',
+      fill:true, tension:.45, borderWidth:2,
+      pointRadius:(ctx,i)=>i.dataIndex===0||i.dataIndex===traj.length-1?4:0,
+      pointBackgroundColor:CC[cls],
+    }))},
+    options:{responsive:true,maintainAspectRatio:false,
+      interaction:{mode:'index',intersect:false},
+      plugins:{legend:{labels:{color:'#7D8FA3',font:{family:'Outfit',size:9},padding:5,boxWidth:8,boxHeight:8}}},
+      scales:{
+        x:{ticks:{color:'#3D4D60',font:{family:'JetBrains Mono',size:8},maxRotation:0,
+          callback:(v,i,ticks)=>{const yr=labels[i];return(yr===2025||yr===2030||yr===2033||yr===2035)?yr:'';}},
+          grid:{color:'rgba(255,255,255,.04)'}},
+        y:{ticks:{color:'#3D4D60',font:{family:'JetBrains Mono',size:8}},grid:{color:'rgba(255,255,255,.04)'},max:100,min:0}
+      }}
+  });
+}
+
+function updatePredFill(pred){
+  if(!selDel)return;
+  const layer=delLayers[selDel];
+  if(layer) layer.setStyle({fillColor:domCol(pred),fillOpacity:.68,weight:3,color:'#FFFFFF',dashArray:'6,3'});
+}
+
+/* ═══════════════════════════════════════════════════════
+   WALK MODE
+═══════════════════════════════════════════════════════ */
+function toggleWalk(){
+  walkMode=!walkMode;
+  const btn=document.getElementById('m-walk');
+  const hud=document.getElementById('walk-hud');
+  if(walkMode){
+    btn.classList.add('active'); hud.style.display='block';
+    map.getContainer().style.cursor='move';
+    const m=selDel?META[selDel]:{lat:36.83,lng:9.97};
+    map.flyTo([m.lat,m.lng],17,{duration:1.8});
+    setLayer('street');
+    if(walkIv) clearInterval(walkIv);
+    walkIv=setInterval(()=>{
+      if(!walkMode){clearInterval(walkIv);return;}
+      const spd=0.00014,c=map.getCenter();let dlat=0,dlng=0;
+      if(walkKeys['ArrowUp']   ||walkKeys['w']||walkKeys['W']) dlat+=spd;
+      if(walkKeys['ArrowDown'] ||walkKeys['s']||walkKeys['S']) dlat-=spd;
+      if(walkKeys['ArrowLeft'] ||walkKeys['a']||walkKeys['A']) dlng-=spd;
+      if(walkKeys['ArrowRight']||walkKeys['d']||walkKeys['D']) dlng+=spd;
+      if(walkKeys['Escape']){toggleWalk();return;}
+      if(dlat||dlng) map.panTo([c.lat+dlat,c.lng+dlng],{animate:false});
+    },30);
+  } else {
+    btn.classList.remove('active'); hud.style.display='none';
+    map.getContainer().style.cursor='';
+    if(walkIv){clearInterval(walkIv);walkIv=null;}
+    const m=selDel?META[selDel]:{lat:36.80,lng:9.88};
+    map.flyTo([m.lat,m.lng],selDel?META[selDel].z:11,{duration:1.5});
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+   TOPBAR / LOG / NOTIF / POPUP
+═══════════════════════════════════════════════════════ */
+function updateTopbar(){
+  if(!selDel)return;
+  const st=getState(selDel);
+  document.getElementById('ts-env').textContent=envScore(st)+'/100';
+  document.getElementById('ts-veg').textContent=st.veg.toFixed(1)+'%';
+  document.getElementById('ts-act').textContent=totalActs;
+}
+function logAction(key,iv,special){
+  const box=document.getElementById('log');
+  const emp=box.querySelector('.log-empty'); if(emp)emp.remove();
+  const msgs={
+    dam:`<b>${selDel}</b>: Dam built — water coverage +${IVS.dam.water}%`,
+    agri:`<b>${selDel}</b>: Cropland expanded — vegetation +${IVS.agri.veg}%`,
+    forest:`<b>${selDel}</b>: Reforestation planted — canopy +${IVS.forest.veg}%`,
+    res:`<b>${selDel}</b>: Residential zone — urban +${IVS.res.urban}%`,
+    solar:`<b>${selDel}</b>: Solar farm deployed on bare land`,
+    ind:`<b>${selDel}</b>: Industrial zone — major LULC impact`,
+    reset:`<b>${selDel}</b>: Reset to 2025 baseline`,
+  };
+  const item=document.createElement('div'); item.className='li';
+  item.innerHTML=`<div class="li-ico">${iv.ico}</div><div class="li-t">${msgs[key]||iv.n}</div>`;
+  box.insertBefore(item,box.firstChild);
+  while(box.children.length>8)box.removeChild(box.lastChild);
+}
+function showOpop(latlng,iv){
+  const pop=document.getElementById('opop'),pt=map.latLngToContainerPoint(latlng);
+  pop.style.display='block';
+  pop.style.left=Math.min(pt.x+20,window.innerWidth-220)+'px';
+  pop.style.top=Math.max(pt.y-80,60)+'px';
+  pop.innerHTML=`<div class="op-t">${iv.ico} ${iv.n}</div><div class="op-d">${iv.desc}</div>
+    <div class="op-r"><span class="op-l">🌿 Vegetation</span><span class="op-v ${iv.veg>=0?'pos':'neg'}">${iv.veg>=0?'+':''}${iv.veg}%</span></div>
+    <div class="op-r"><span class="op-l">💧 Water</span><span class="op-v ${iv.water>=0?'pos':'neg'}">${iv.water>=0?'+':''}${iv.water}%</span></div>
+    <div class="op-r"><span class="op-l">🏙 Urban</span><span class="op-v ${iv.urban<=0?'pos':'neg'}">${iv.urban>=0?'+':''}${iv.urban}%</span></div>
+    <div class="op-r"><span class="op-l">🏜 Bare</span><span class="op-v ${iv.bare<=0?'pos':'neg'}">${iv.bare>=0?'+':''}${iv.bare}%</span></div>`;
+  clearTimeout(pop._t); pop._t=setTimeout(()=>pop.style.display='none',4500);
+}
+function notify(msg){
+  const el=document.getElementById('notif');
+  el.textContent=msg; el.style.display='block';
+  clearTimeout(el._t); el._t=setTimeout(()=>el.style.display='none',3000);
+}
+</script>
+</body>
+</html>
