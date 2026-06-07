@@ -1,0 +1,1 @@
+# lulc-analysis-prediction-platform
